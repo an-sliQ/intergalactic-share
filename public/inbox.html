@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Inbox | Plumb</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#181a17">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/inbox.css">
+</head>
+<body class="ib-body">
+
+<!-- Sign in -->
+<section class="ib-login" data-view="login" hidden>
+  <div class="ib-login-inner">
+    <a class="wordmark" href="/">Plumb<span>.</span></a>
+    <div>
+      <p class="eyebrow">Team only</p>
+      <h1>INBOX<span class="mo-dot">.</span><em>Answer visitors in real time.</em></h1>
+    </div>
+    <form class="ib-login-form" data-login novalidate>
+      <label>Your name, as visitors will see it<input name="name" autocomplete="name" placeholder="e.g. Noah" required maxlength="40"></label>
+      <label>Team password<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="hx-btn" type="submit">Sign in <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+      <p class="ib-error" role="alert" data-login-error></p>
+    </form>
+  </div>
+</section>
+
+<!-- App -->
+<div class="ib-app" data-view="app" hidden>
+  <header class="ib-top">
+    <a class="wordmark" href="/" target="_blank" rel="noopener">Plumb<span>.</span></a>
+    <span class="ib-top-label">Inbox</span>
+    <span class="ib-me" data-me></span>
+    <div class="ib-top-actions">
+      <button class="ib-ghost" type="button" data-notify>Turn on alerts</button>
+      <button class="ib-ghost" type="button" data-signout>Sign out</button>
+    </div>
+  </header>
+
+  <div class="ib-cols" data-cols>
+    <aside class="ib-list-col" aria-label="Conversations">
+      <div class="ib-list-tools">
+        <div class="ib-tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-filter="open">Open <span data-count="open"></span></button>
+          <button role="tab" aria-selected="false" data-filter="closed">Closed</button>
+          <button role="tab" aria-selected="false" data-filter="all">All</button>
+        </div>
+        <input class="ib-search" type="search" placeholder="Search name, email or message" data-search aria-label="Search conversations">
+      </div>
+      <ul class="ib-list" data-list></ul>
+      <div class="ib-list-empty" data-list-empty hidden>
+        <strong>No conversations yet.</strong>
+        <p>Open the <a href="/" target="_blank" rel="noopener">contact page</a> in another tab and send a message. It will appear here instantly.</p>
+      </div>
+    </aside>
+
+    <main class="ib-thread-col" data-thread-col>
+      <div class="ib-empty" data-empty>
+        <p class="eyebrow">Inbox</p>
+        <h2>PICK A <em>conversation.</em></h2>
+        <p>New chats appear on the left the moment a visitor writes. Visitors see that you're online while this tab is open.</p>
+      </div>
+      <section class="ib-thread" data-thread hidden>
+        <header class="ib-thread-head">
+          <button class="ib-back" type="button" data-back aria-label="Back to conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button>
+          <span class="ib-avatar" data-t-avatar></span>
+          <div class="ib-thread-title"><strong data-t-name></strong><span data-t-sub></span></div>
+          <button class="ib-ghost" type="button" data-t-details>Details</button>
+          <button class="ib-ghost" type="button" data-t-status>Close</button>
+        </header>
+        <div class="ib-messages" data-messages role="log" aria-live="polite"></div>
+        <div class="ib-quick" data-quick></div>
+        <form class="lc-compose ib-compose" data-compose>
+          <label class="sr-only" for="ib-input">Reply</label>
+          <textarea id="ib-input" rows="1" placeholder="Reply… (Enter to send, Shift+Enter for a new line)" maxlength="4000"></textarea>
+          <button class="lc-send" type="submit" aria-label="Send" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+        </form>
+      </section>
+    </main>
+
+    <aside class="ib-details" data-details hidden aria-label="Visitor details"></aside>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.min.js" defer></script>
+<script src="/js/inbox.js" type="module"></script>
+</body>
+</html>
