@@ -330,6 +330,7 @@ function openDrawer() {
   drawer.append(ui.panel);
   drawer.classList.remove('is-leaving'); drawer.classList.add('is-entering');
   if (matchMedia('(max-width:650px)').matches) document.documentElement.classList.add('menu-locked');
+  fitDrawer();
   scrollToBottom(true);
   updateLauncher();
   markReadIfVisible();
@@ -341,13 +342,27 @@ function closeDrawer() {
   document.documentElement.classList.remove('menu-locked');
   const done = () => {
     drawer.hidden = true; drawer.classList.remove('is-leaving');
-    state.mode = 'inline'; ui.panel.dataset.mode = 'inline';
+    state.mode = 'inline'; ui.panel.dataset.mode = 'inline'; fitDrawer();
     slot.append(ui.panel); scrollToBottom(true); updateLauncher();
     launcher?.focus({ preventScroll: true });
   };
   matchMedia('(prefers-reduced-motion: reduce)').matches ? done() : setTimeout(done, 280);
 }
 launcher?.addEventListener('click', openDrawer);
+
+// Phones: keep the full-screen chat exactly the size of the visible area, so the
+// on-screen keyboard never covers the message box (iOS doesn't resize 100dvh for it).
+const vv = window.visualViewport;
+const phone = matchMedia('(max-width:650px)');
+function fitDrawer() {
+  if (!vv || state.mode !== 'drawer' || !phone.matches) { drawer.style.removeProperty('--vvh'); drawer.style.removeProperty('top'); return; }
+  drawer.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+  drawer.style.top = `${Math.round(vv.offsetTop)}px`;
+  if (document.activeElement === ui.input) scrollToBottom(true);
+}
+vv?.addEventListener('resize', fitDrawer);
+vv?.addEventListener('scroll', fitDrawer);
+phone.addEventListener?.('change', fitDrawer);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.mode === 'drawer') closeDrawer(); });
 
 // Any "start a chat" link: scroll to the in-page chat when it's above it, otherwise open the drawer.

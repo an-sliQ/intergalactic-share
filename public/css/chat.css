@@ -136,3 +136,29 @@
   .lc-foot span:last-child{display:none}
 }
 @media(prefers-reduced-motion:reduce){.lc-row,.lc-system,.lc-chips,.lc-card,.lc-typing,.lc-drawer{animation:none!important}}
+
+/* Launcher stays visible on dark sections too */
+.lc-launcher{box-shadow:0 0 0 1px #f2f0e74d,0 18px 40px -14px #18191780}
+
+/* ---------- Phones ---------- */
+@media(max-width:650px){
+  /* compact floating button in the corner instead of a full-width bar */
+  .lc-launcher{left:auto;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));padding:7px 16px 7px 7px;gap:10px}
+  .lc-launcher-text small{display:none}
+  .lc-launcher-avatars span{width:36px;height:36px}
+  /* in-page panel grows with the conversation instead of showing a tall empty box */
+  .lc[data-mode=inline]{height:auto}
+  .lc[data-mode=inline] .lc-thread{flex:none;min-height:260px;max-height:min(540px,62svh)}
+  /* full-screen drawer that follows the on-screen keyboard and respects the notch / home bar */
+  .lc-drawer{top:0;right:0;bottom:auto;left:0;width:100%;height:var(--vvh,100dvh)}
+  .lc[data-mode=drawer] .lc-head{padding-top:calc(14px + env(safe-area-inset-top))}
+  .lc[data-mode=drawer] .lc-foot{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .lc[data-mode=drawer] .lc-close{width:44px;height:44px}
+  /* readable, tappable, and no iPhone auto-zoom on focus (inputs ≥ 16px) */
+  .lc-chip{min-height:42px;font-size:13.5px}
+  .lc-card input{font-size:16px;height:48px}
+  .lc-card button{height:50px}
+  .lc-foot{font-size:11.5px}
+  .lc-day,.lc-chips-label{font-size:10.5px}
+  .lc-send{width:58px}
+}

@@ -112,4 +112,5 @@
   .ib-details{top:0;width:100%;z-index:40}
   .ib-login-inner{grid-template-columns:1fr;align-content:start}
   .ib-messages .lc-row{max-width:90%}
+  .ib-search{font-size:16px;height:44px}          /* no iPhone auto-zoom */
 }

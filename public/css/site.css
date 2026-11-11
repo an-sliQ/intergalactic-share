@@ -442,3 +442,53 @@ html.mo .chat-stage[data-mo-reveal].is-in{transform:none}
   html.gx .hx-rail span{transform:none}
   .mo-cursor{display:none}
 }
+
+/* ==========================================================================
+   Phones & touch screens
+   ========================================================================== */
+/* Touch screens have no real hover: stop tap-and-scroll leaving cards stuck in their hover state. */
+@media (hover:none){
+  .re-service:hover{background:transparent;padding-inline:0}
+  .re-service:hover p{color:var(--muted)}
+  .re-service:hover .re-service-arrow{transform:none}
+  .re-service:hover .mo-icon{transform:none}
+  .re-service:active{background:var(--acid)}
+  .hx-quote-side .hx-quote:hover{transform:none;background:var(--paper)}
+}
+@media(max-width:650px){
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  .eyebrow{font-size:11px}
+  /* hero issue line: stacked, readable */
+  .ed-issue-line{flex-direction:column;align-items:flex-start;gap:8px;font-size:10px;letter-spacing:.08em;line-height:1.5}
+  .ed-heading-row{padding:28px 0 26px}
+  .hx-actions{gap:10px}
+  /* chat section: less dead space, panel sized to its content */
+  .chat-section{padding-block:56px 64px}
+  .chat-copy h2{font-size:clamp(48px,16vw,64px)}
+  .chat-grid{gap:44px}
+  .chat-slot{height:auto;min-height:0}
+  .chat-slot::before{top:-8px;left:-8px;width:42%;height:120px}
+  /* headings that must never overflow on small phones */
+  .re-section-head h2,.hx-faq-head h2,.hx-proof-head h2{font-size:clamp(40px,13.6vw,54px)}
+  .re-service h3{font-size:clamp(26px,8.2vw,31px)}
+  .hx-statement h2,.hx-statement p{overflow-wrap:break-word}
+  /* process: use the full width */
+  .hx-step{padding-right:0}
+  .hx-step p:last-child{max-width:none;font-size:15px}
+  .hx-proof,.hx-faq,.hx-process,.re-services{padding-block:60px}
+  .hx-statement{padding-block:72px}
+  /* bigger tap targets */
+  .text-link{padding-block:12px 10px}
+  .footer-nav{flex-wrap:wrap;gap:0 24px}
+  .footer-nav a{display:inline-block;padding-block:12px}
+  .footer-contact{display:inline-block;padding-block:10px}
+  .hx-faq-list summary{min-height:56px}
+  /* keep the floating chat button from covering the last lines of the page */
+  .footer-bottom{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+}
+@media(max-width:380px){
+  .shell{width:calc(100% - 32px)}
+  .ed-heading-row h1{font-size:16vw}
+  .hx-btn,.hx-btn-ghost{padding:15px 12px;font-size:14px;gap:10px}
+  .hx-step svg{max-width:170px}
+}
