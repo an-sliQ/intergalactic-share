@@ -297,6 +297,7 @@ function start() {
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized') { localStorage.removeItem(AUTH_KEY); state.auth = null; show('login'); $('[data-login-error]').textContent = 'Your session expired. Sign in again.'; socket.disconnect(); }
   });
+  socket.on('session:expired', () => { localStorage.removeItem(AUTH_KEY); state.auth = null; socket.disconnect(); show('login'); $('[data-login-error]').textContent = 'Your session expired. Sign in again.'; });
   socket.on('ready', (r) => {
     state.convs = new Map(r.conversations.map((c) => [c.id, c]));
     renderList();

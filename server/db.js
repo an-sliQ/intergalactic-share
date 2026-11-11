@@ -4,11 +4,12 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export function openDb(file) {
-  mkdirSync(dirname(file), { recursive: true });
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(file);
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
+    PRAGMA secure_delete = ON;
     CREATE TABLE IF NOT EXISTS conversations (
       id            TEXT PRIMARY KEY,
       token_hash    TEXT NOT NULL,
@@ -52,7 +53,7 @@ export function openDb(file) {
     insertMsg: db.prepare(`INSERT INTO messages (conversation_id, sender, agent_name, body, created_at)
       VALUES (?, ?, ?, ?, ?)`),
     getMsg: db.prepare(`SELECT * FROM messages WHERE id = ?`),
-    listMsgs: db.prepare(`SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`),
+    listMsgs: db.prepare(`SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 500) ORDER BY id ASC`),
     markRead: db.prepare(`UPDATE messages SET read_at = ? WHERE conversation_id = ? AND sender = ? AND read_at IS NULL`),
     countVisitorMsgs: db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND sender = 'visitor'`),
     listConvs: db.prepare(`

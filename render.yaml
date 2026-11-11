@@ -13,12 +13,16 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: production    # strict security mode: refuses weak passwords, blocks framing and foreign origins
+      - key: CLIENT_IP_HEADER
+        value: true-client-ip  # Render's edge sets this to the real visitor IP and rejects forged values
       - key: DB_FILE
         value: /var/data/chat.db
       - key: SESSION_SECRET
         generateValue: true
       - key: INBOX_PASSWORD
-        sync: false          # Render asks you for this when you create the Blueprint
+        sync: false          # Render asks for this when you create the Blueprint (12+ characters)
       - key: PUBLIC_URL
         sync: false          # e.g. https://yourdomain.com
       - key: NOTIFY_WEBHOOK_URL

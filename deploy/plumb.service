@@ -7,10 +7,25 @@ After=network.target
 User=plumb
 WorkingDirectory=/opt/plumb
 EnvironmentFile=/opt/plumb/.env
-Environment=HOST=127.0.0.1 PORT=3000 DB_FILE=/opt/plumb/.data/chat.db
+Environment=NODE_ENV=production HOST=127.0.0.1 PORT=3000 TRUST_PROXY=1 DB_FILE=/opt/plumb/.data/chat.db
 ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.js
 Restart=always
 RestartSec=3
+# Sandboxing: the app can only write to its data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/opt/plumb/.data
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

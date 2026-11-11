@@ -28,16 +28,21 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 | Live signals | Typing indicators both ways, delivered and seen receipts, visitor on-page status |
 | Conversion | Quick-start chips, an inline email capture after the first message, an offline auto-reply, and a floating launcher with unread badge and sound |
 | Alerts for the team | Sound, tab badge, desktop notifications (“Turn on alerts”), and optional Slack/Discord webhook |
-| Safety | Rate limits, 4,000-character messages, user text is never rendered as HTML, signed agent sessions |
+| Security | See [SECURITY.md](SECURITY.md). Strict CSP, crash-proof socket handlers, layered rate limits, origin checks, signed sessions that are revoked when the password changes |
 
 ## Configuration (environment variables)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `INBOX_PASSWORD` | `plumb-demo` | Team password for `/inbox`. **Change it.** |
+| `INBOX_PASSWORD` | `plumb-demo` | Team password for `/inbox`. **Change it** (12+ characters; required in production). Changing it signs everyone out. |
 | `SESSION_SECRET` | random per boot | Signs inbox sessions. Set it so sign-ins survive restarts. |
 | `NOTIFY_WEBHOOK_URL` | none | Slack or Discord incoming webhook. Pings on new chats, and on messages while nobody is online. |
 | `PUBLIC_URL` | none | e.g. `https://example.com`. Adds an inbox link to webhook pings. |
+| `NODE_ENV` | none | Set to `production` when live. Enables strict mode: refuses a weak or missing password, blocks framing (clickjacking) and foreign-origin chat connections, and sends HSTS. |
+| `CLIENT_IP_HEADER` | none | A header your host sets to the real visitor IP (`true-client-ip` on Render, `cf-connecting-ip` behind Cloudflare, `fly-client-ip` on Fly.io). Used for rate limits. |
+| `TRUST_PROXY` | `1` | Number of proxies in front of the app, used when `CLIENT_IP_HEADER` is not set. Use `0` if the app faces the internet directly. |
+| `ALLOWED_ORIGINS` | none | Extra comma-separated origins allowed to open chat connections (your own domain is always allowed). |
+| `SESSION_DAYS` | `14` | How long an inbox sign-in lasts (1–90). |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | |
 | `DB_FILE` | `.data/chat.db` | |
 

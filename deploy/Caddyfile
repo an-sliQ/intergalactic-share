@@ -2,5 +2,9 @@
 # and passes WebSockets through without extra config.
 yourdomain.com, www.yourdomain.com {
 	encode zstd gzip
+	header -Server
+	request_body {
+		max_size 64KB
+	}
 	reverse_proxy 127.0.0.1:3000
 }
