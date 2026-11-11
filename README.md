@@ -4,6 +4,8 @@ A conversion-focused contact page for a websites and AI automation studio. Visit
 
 The visual system follows the editorial style of endcap.design: paper `#f2f0e7`, ink `#181a17` and acid `#dce87a`, Hanken Grotesk at 900 weight with Fraunces italic accents, square corners, and motion on `cubic-bezier(.32,.72,0,1)` and spring `cubic-bezier(.34,1.56,.64,1)`.
 
+> **Publishing on your domain:** see [DEPLOY.md](DEPLOY.md) (Render one-click Blueprint, or a VPS with automatic HTTPS).
+
 ## Run it
 
 ```bash

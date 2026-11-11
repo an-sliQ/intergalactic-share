@@ -328,6 +328,18 @@ function handleAgent(socket) {
   socket.on('disconnect', () => { agentSockets.delete(socket.id); broadcastPresence(); });
 }
 
+// Clean shutdown on deploys/restarts: stop accepting, tell clients to reconnect, close the database.
+let stopping = false;
+function shutdown(signal) {
+  if (stopping) return; stopping = true;
+  console.log(`${signal} received, shutting down…`);
+  io.close();
+  server.close(() => { try { db.close(); } catch {} process.exit(0); });
+  setTimeout(() => process.exit(0), 8000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 server.listen(PORT, HOST, () => {
   console.log(`\n  Contact page  → http://localhost:${PORT}/`);
   console.log(`  Team inbox    → http://localhost:${PORT}/inbox\n`);

@@ -1,0 +1,6 @@
+# /etc/caddy/Caddyfile — replace yourdomain.com. Caddy gets the HTTPS certificate automatically
+# and passes WebSockets through without extra config.
+yourdomain.com, www.yourdomain.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+}

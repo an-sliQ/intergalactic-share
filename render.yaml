@@ -1,0 +1,29 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# A persistent disk keeps chat history across deploys (needs the Starter plan or above).
+services:
+  - type: web
+    name: plumb-contact
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_FILE
+        value: /var/data/chat.db
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: INBOX_PASSWORD
+        sync: false          # Render asks you for this when you create the Blueprint
+      - key: PUBLIC_URL
+        sync: false          # e.g. https://yourdomain.com
+      - key: NOTIFY_WEBHOOK_URL
+        sync: false          # optional Slack/Discord webhook
+    disk:
+      name: chat-data
+      mountPath: /var/data
+      sizeGB: 1

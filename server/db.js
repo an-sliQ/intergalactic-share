@@ -73,6 +73,7 @@ export function openDb(file) {
   };
 
   return {
+    close: () => db.close(),
     createConversation({ id, tokenHash, page, referrer, userAgent, timezone }) {
       const now = Date.now();
       q.insertConv.run(id, tokenHash, page ?? null, referrer ?? null, userAgent ?? null, timezone ?? null, now, now);
