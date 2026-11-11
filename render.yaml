@@ -2,8 +2,8 @@
 #
 # FREE plan: no card needed, and Render never bills a workspace that has no card on file.
 # Trade-offs of free: the server sleeps after 15 minutes without visitors (the next visitor waits ~1 minute),
-# and the disk is wiped whenever it sleeps or redeploys. That is why chat history is backed up to Cloudflare R2
-# (see the R2_* settings and DEPLOY.md, step 2). Until R2 is set up, history resets each time the server sleeps.
+# and the disk is wiped whenever it sleeps or redeploys. That is why chat history is backed up to Supabase Storage
+# (free, no card; see SETUP.md step 1). Until Supabase is set up, history resets each time the server sleeps.
 services:
   - type: web
     name: plumb-contact
@@ -29,23 +29,13 @@ services:
         sync: false          # team password (12+ chars). Not needed once Google sign-in is on.
       - key: NOTIFY_WEBHOOK_URL
         sync: false          # optional Slack/Discord webhook
-      # --- Step 1: Google sign-in for the team (Firebase, free Spark plan) ---
-      - key: FIREBASE_API_KEY
-        sync: false
-      - key: FIREBASE_AUTH_DOMAIN
-        sync: false
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_APP_ID
-        sync: false
+      # --- SETUP.md step 1: Supabase (free, no card) for chat files + database backups ---
+      - key: SUPABASE_URL
+        sync: false          # https://<project>.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false          # sb_publishable_… (public; also enables Google sign-in)
+      - key: SUPABASE_SECRET_KEY
+        sync: false          # sb_secret_… (keep private: server only)
+      # --- SETUP.md step 2: who may sign in with Google ---
       - key: TEAM_EMAILS
-        sync: false          # who may sign in, e.g. "you@gmail.com, sara@gmail.com" or "@yourcompany.com"
-      # --- Step 2: Cloudflare R2 (chat files + database backups; free tier) ---
-      - key: R2_ACCOUNT_ID
-        sync: false
-      - key: R2_BUCKET
-        sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
+        sync: false          # e.g. "you@gmail.com, sara@gmail.com" or "@yourcompany.com"

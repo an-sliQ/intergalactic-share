@@ -12,9 +12,9 @@ import {
   makeClientIp, rateKey, makeLimiter, cleanText, EMAIL_RE, UUID_RE, isPlainObject,
   webhookSafe, securityHeaders, makeOriginCheck,
 } from './security.js';
-import { makeR2 } from './r2.js';
+import { makeStorage } from './storage.js';
 import { restoreIfMissing, startBackups } from './backup.js';
-import { makeFirebaseAuth } from './auth.js';
+import { makeSupabaseAuth } from './auth.js';
 import { sniff, safeFileName, ACCEPT } from './files.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,10 +38,10 @@ const ALLOWED_ORIGINS = [PUBLIC_URL, ...(env.ALLOWED_ORIGINS || '').split(',')].
 const SESSION_DAYS = Math.min(Math.max(Number(env.SESSION_DAYS) || 14, 1), 90);
 
 // Optional services (each stays off until its settings are present).
-const firebase = makeFirebaseAuth(env);
-const r2 = makeR2(env);
-const PASSWORD_LOGIN = env.ALLOW_PASSWORD_LOGIN === 'true' ? true : env.ALLOW_PASSWORD_LOGIN === 'false' ? false : !firebase.enabled;
-const FILES_ENABLED = r2.enabled && env.FILE_UPLOADS !== 'off';
+const supaAuth = makeSupabaseAuth(env);
+const store = makeStorage(env);
+const PASSWORD_LOGIN = env.ALLOW_PASSWORD_LOGIN === 'true' ? true : env.ALLOW_PASSWORD_LOGIN === 'false' ? false : !supaAuth.enabled;
+const FILES_ENABLED = store.enabled && env.FILE_UPLOADS !== 'off';
 const FILE_MAX_MB = Math.min(Math.max(Number(env.FILE_MAX_MB) || 10, 1), 25);
 const UPLOADS_PER_DAY = Math.max(Number(env.UPLOADS_PER_DAY) || 300, 1);
 const BACKUP_INTERVAL_SEC = Math.max(Number(env.BACKUP_INTERVAL_SEC) || 180, 30);
@@ -51,21 +51,23 @@ if (PRODUCTION && PASSWORD_LOGIN && (!env.INBOX_PASSWORD || INBOX_PASSWORD === D
   console.error('\n  ✖  Refusing to start: set INBOX_PASSWORD to a private password of at least 12 characters (or turn on Google sign-in).\n');
   process.exit(1);
 }
-if (PRODUCTION && !PASSWORD_LOGIN && !firebase.enabled) {
-  console.error('\n  ✖  Refusing to start: no way to sign in to the inbox. Set the FIREBASE_* settings or ALLOW_PASSWORD_LOGIN=true.\n');
+if (PRODUCTION && !PASSWORD_LOGIN && !supaAuth.enabled) {
+  console.error('\n  ✖  Refusing to start: no way to sign in to the inbox. Set SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY or ALLOW_PASSWORD_LOGIN=true.\n');
   process.exit(1);
 }
 if (PASSWORD_LOGIN && !env.INBOX_PASSWORD) console.warn(`\n  ⚠  INBOX_PASSWORD is not set. Using the demo password "${DEMO_PASSWORD}". Set it before going live.\n`);
 else if (PASSWORD_LOGIN && INBOX_PASSWORD.length < 12) console.warn('\n  ⚠  INBOX_PASSWORD is short. Use 12+ characters.\n');
-if (firebase.enabled && !firebase.teamConfigured) console.warn('\n  ⚠  Google sign-in is on but TEAM_EMAILS is empty, so nobody can sign in with Google yet.\n');
+if (supaAuth.ready && !supaAuth.teamConfigured) console.log('\n  ℹ  Google sign-in is ready. Add TEAM_EMAILS to switch it on (the team password stays on until then).\n');
 if (PRODUCTION && !env.SESSION_SECRET) console.warn('\n  ⚠  SESSION_SECRET is not set: the team will be signed out on every restart.\n');
 if (env.NOTIFY_WEBHOOK_URL && !NOTIFY_WEBHOOK_URL) console.warn('\n  ⚠  NOTIFY_WEBHOOK_URL must start with https:// — notifications are off.\n');
 
-// On free hosting the disk starts empty: bring the database back from R2 before opening it.
-const restore = await restoreIfMissing({ r2, dbFile: DB_FILE });
+if (env.SUPABASE_URL && !store.enabled && !supaAuth.enabled) console.warn('\n  ⚠  SUPABASE_URL is set but no keys are: add SUPABASE_PUBLISHABLE_KEY (sign-in) and SUPABASE_SECRET_KEY (files + backups).\n');
+
+// On free hosting the disk starts empty: bring the database back from Supabase Storage before opening it.
+const restore = await restoreIfMissing({ store, dbFile: DB_FILE });
 const db = openDb(DB_FILE);
-r2.attachDb(db);
-const backups = startBackups({ r2, db, intervalSec: BACKUP_INTERVAL_SEC, keepDays: BACKUP_KEEP_DAYS, safeToBackUp: restore.safeToBackUp });
+store.attachDb(db);
+const backups = startBackups({ store, db, intervalSec: BACKUP_INTERVAL_SEC, keepDays: BACKUP_KEEP_DAYS, safeToBackUp: restore.safeToBackUp });
 const clientIp = makeClientIp({ header: CLIENT_IP_HEADER, hops: TRUST_PROXY });
 const allow = makeLimiter();
 const originOk = makeOriginCheck({ allowed: ALLOWED_ORIGINS, production: PRODUCTION });
@@ -115,7 +117,7 @@ function verifyAgent(token) {
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
     if (!(data.exp > Date.now()) || typeof data.n !== 'string') return null;
-    if (data.e) { if (!firebase.enabled || !firebase.isTeam(data.e)) return null; }
+    if (data.e) { if (!supaAuth.enabled || !supaAuth.isTeam(data.e)) return null; }
     else if (!PASSWORD_LOGIN || data.pv !== PASSWORD_VERSION) return null;
     return { name: data.n, email: data.e || null, exp: data.exp };
   } catch { return null; }
@@ -161,8 +163,8 @@ app.use(securityHeaders({
   publicDir: PUBLIC_DIR,
   production: PRODUCTION,
   extra: (req) => {
-    const x = { img: r2.enabled ? [r2.origin] : [] };
-    if (isInboxPath(req.path) && firebase.csp) Object.assign(x, firebase.csp, { popups: true });
+    const x = { img: store.enabled ? [store.origin] : [] };
+    if (isInboxPath(req.path) && supaAuth.csp) Object.assign(x, supaAuth.csp);
     return x;
   },
 }));
@@ -186,28 +188,33 @@ app.post('/api/login', express.json({ limit: '4kb', strict: true }), async (req,
   }
   res.json({ token: signAgent(name), name });
 });
-// What the inbox login screen should offer. Firebase web config is public by design.
+// What the inbox login screen should offer. The Supabase URL and publishable key are public by design.
 app.get('/api/config', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ googleSignIn: firebase.publicConfig, passwordLogin: PASSWORD_LOGIN });
+  res.json({ googleSignIn: supaAuth.publicConfig, passwordLogin: PASSWORD_LOGIN });
 });
 
 app.post('/api/login/google', express.json({ limit: '8kb', strict: true }), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const ip = rateKey(clientIp(req.headers, req.socket.remoteAddress));
   if (!originOk(req.headers)) return res.status(403).json({ error: 'Blocked.' });
-  if (!firebase.enabled) return res.status(404).json({ error: 'Google sign-in is not set up.' });
+  if (!supaAuth.enabled) return res.status(404).json({ error: 'Google sign-in is not set up.' });
   if (!allow(`login:${ip}`, LIMITS.loginPerIp) || !allow('login:global', LIMITS.loginGlobal)) {
     return res.status(429).json({ error: 'Too many attempts. Wait a minute and try again.' });
   }
   const body = isPlainObject(req.body) ? req.body : {};
   let who;
-  try { who = await firebase.verifyIdToken(body.idToken); } catch (e) {
+  try { who = await supaAuth.verifyAccessToken(body.accessToken); } catch (e) {
     console.warn(`Rejected Google sign-in from ${ip}: ${e.code || e.message}`);
+    if (e.code === 'UPSTREAM' || e.name === 'TimeoutError' || e.name === 'TypeError') return res.status(503).json({ error: 'Supabase did not answer. Try again in a moment.' });
     return res.status(401).json({ error: 'Google sign-in could not be verified. Try again.' });
   }
   if (!who.email || !who.emailVerified) return res.status(403).json({ error: 'Use a Google account with a verified email address.' });
-  if (!firebase.isTeam(who.email)) {
+  if (!who.viaGoogle) {
+    console.warn(`Sign-in for ${who.email} (${ip}) refused: not a Google sign-in`);
+    return res.status(403).json({ error: 'Please use "Continue with Google".' });
+  }
+  if (!supaAuth.isTeam(who.email)) {
     console.warn(`Google sign-in from ${who.email} (${ip}) refused: not on TEAM_EMAILS`);
     return res.status(403).json({ error: `${who.email} is not on the team list. Ask the owner to add it to TEAM_EMAILS.` });
   }
@@ -216,7 +223,7 @@ app.post('/api/login/google', express.json({ limit: '8kb', strict: true }), asyn
 });
 
 // File upload: the server checks who is uploading BEFORE reading the body, checks the real file type
-// from its bytes, keeps every free-tier cap, then stores it privately in R2.
+// from its bytes, keeps every free-tier cap, then stores it privately in Supabase Storage.
 const uploadDay = { day: '', count: 0 };
 function uploadAuth(req, res, next) {
   res.setHeader('Cache-Control', 'no-store');
@@ -250,11 +257,9 @@ function uploadAuth(req, res, next) {
   const today = new Date().toISOString().slice(0, 10);
   if (uploadDay.day !== today) { uploadDay.day = today; uploadDay.count = 0; }
   if (uploadDay.count >= UPLOADS_PER_DAY) return res.status(429).json({ error: 'File sharing is paused for today. Please email the file instead.' });
-  if (db.attachmentBytes() + backups.bytesStored() + len > r2.limits.storageBytes) {
+  if (db.attachmentBytes() + backups.bytesStored() + len > store.limits.storageBytes) {
     return res.status(507).json({ error: 'File storage is full. Please email the file instead.' });
   }
-  // Keep ~7% of the monthly write budget for database backups, which matter more than files.
-  if (!r2.canWrite(1 + Math.floor(r2.limits.writesPerMonth * 0.07))) return res.status(503).json({ error: 'File sharing is paused for this month. Please email the file instead.' });
   req.conv = conv;
   next();
 }
@@ -270,13 +275,10 @@ app.post('/api/files', uploadAuth, express.raw({ type: () => true, limit: `${FIL
   const id = randomUUID();
   const key = `files/${req.conv.id}/${id}`;
   try {
-    await r2.put(key, buf, {
-      contentType: type.mime,
-      contentDisposition: type.kind === 'image' ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
-    });
+    await store.put(key, buf, { contentType: type.mime.split(';')[0] }); // bucket allow-list matches bare types
   } catch (e) {
-    console.error('Upload to R2 failed:', e.message);
-    return res.status(e.code === 'R2_CAP' ? 503 : 502).json({ error: 'Could not store the file. Please try again or email it.' });
+    console.error('Upload to storage failed:', e.message);
+    return res.status(502).json({ error: 'Could not store the file. Please try again or email it.' });
   }
   uploadDay.count += 1;
   let row;
@@ -286,7 +288,7 @@ app.post('/api/files', uploadAuth, express.raw({ type: () => true, limit: `${FIL
       attachment: { id, key, name, mime: type.mime, kind: type.kind, size: buf.length },
     });
   } catch (e) {
-    r2.del(key).catch(() => {});
+    store.del(key).catch(() => {});
     console.error('Saving attachment failed:', e);
     return res.status(500).json({ error: 'Could not save the file.' });
   }
@@ -298,6 +300,20 @@ app.post('/api/files', uploadAuth, express.raw({ type: () => true, limit: `${FIL
   const own = s && ((req.uploader.role === 'visitor' && s.data.conversationId === req.conv.id) || (req.uploader.role === 'agent' && s.data.role === 'agent')) ? s : null;
   if (req.uploader.role === 'visitor') afterVisitorMessage(req.conv.id, msg, own, { isNew: false, preview: `File: ${name}` });
   else afterAgentMessage(req.conv.id, msg, req.uploader.name, own);
+});
+
+// Called once a day by the free GitHub Action in .github/workflows/keepalive.yml (or any uptime pinger).
+// Wakes the server and touches Supabase at most every 6 hours, so a quiet week can't get the free project paused.
+let lastPing = 0;
+app.get('/api/keepalive', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!store.enabled) return res.json({ ok: true, supabase: 'off' });
+  if (Date.now() - lastPing < 6 * 3600_000) return res.json({ ok: true, supabase: 'recent' });
+  lastPing = Date.now();
+  try { await store.ping(); res.json({ ok: true, supabase: 'pinged' }); } catch (e) {
+    lastPing = 0; console.warn('Keep-alive ping failed:', e.message);
+    res.status(502).json({ ok: false, supabase: 'unreachable' });
+  }
 });
 
 app.all('/api/*', (_req, res) => res.status(404).json({ error: 'Not found' }));
@@ -473,13 +489,13 @@ async function fileUrl(socket, p, ack) {
   if (!att) return ack({ error: 'Not found' });
   if (socket.data.role !== 'agent' && att.conversation_id !== socket.data.conversationId) return ack({ error: 'Not found' });
   try {
-    const expiresSec = 1800;
-    const url = await r2.presignGet(att.object_key, {
-      expiresSec, filename: att.name, contentType: att.mime, inline: att.kind === 'image' || att.mime === 'application/pdf',
-    });
-    ack({ ok: true, url, expiresAt: Date.now() + (expiresSec - 60) * 1000 });
+    // Images and PDFs open in the browser; everything else downloads with its real name.
+    const inline = att.kind === 'image' || att.mime === 'application/pdf';
+    const { url, expiresAt } = await store.signedUrl(att.object_key, { expiresSec: 1800, size: att.size, downloadName: inline ? null : att.name });
+    ack({ ok: true, url, expiresAt });
   } catch (e) {
-    ack({ error: e.code === 'R2_CAP' ? 'File viewing is paused for this month.' : 'Could not open the file.' });
+    if (e.code !== 'STORAGE_CAP') console.warn('Signed link failed:', e.message);
+    ack({ error: e.code === 'STORAGE_CAP' ? 'File viewing is paused until next month.' : 'Could not open the file.' });
   }
 }
 
@@ -645,7 +661,7 @@ async function shutdown(signal) {
   io.close();
   server.close();
   try {
-    if (backups.enabled && await Promise.race([backups.final(), new Promise((r) => setTimeout(() => r('timeout'), 12000))]) === true) console.log('  ↑  Final backup saved to R2.');
+    if (backups.enabled && await Promise.race([backups.final(), new Promise((r) => setTimeout(() => r('timeout'), 12000))]) === true) console.log('  ↑  Final backup saved to Supabase.');
   } catch (e) { console.warn('Final backup failed:', e.message); }
   try { db.close(); } catch {}
   process.exit(0);
@@ -656,7 +672,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 server.listen(PORT, HOST, () => {
   console.log(`\n  Contact page  → http://localhost:${PORT}/`);
   console.log(`  Team inbox    → http://localhost:${PORT}/inbox`);
-  console.log(`  Sign-in       → ${[firebase.enabled && 'Google (Firebase)', PASSWORD_LOGIN && 'team password'].filter(Boolean).join(' + ')}`);
-  console.log(`  Files         → ${FILES_ENABLED ? `on, up to ${FILE_MAX_MB} MB, ${r2.describe()}` : 'off (set the R2_* settings to turn on)'}`);
-  console.log(`  Backups       → ${backups.enabled ? `to R2 every ${BACKUP_INTERVAL_SEC}s when something changed, ${BACKUP_KEEP_DAYS} daily copies kept` : r2.enabled ? 'OFF this run (R2 was unreachable at start)' : 'off (set the R2_* settings to turn on)'}\n`);
+  console.log(`  Sign-in       → ${[supaAuth.enabled && 'Google (Supabase)', PASSWORD_LOGIN && 'team password'].filter(Boolean).join(' + ')}`);
+  console.log(`  Files         → ${FILES_ENABLED ? `on, up to ${FILE_MAX_MB} MB, ${store.describe()}` : 'off (set SUPABASE_URL + SUPABASE_SECRET_KEY to turn on)'}`);
+  console.log(`  Backups       → ${backups.enabled ? `to Supabase every ${BACKUP_INTERVAL_SEC}s when something changed, ${BACKUP_KEEP_DAYS} daily copies kept` : store.enabled ? 'OFF this run (Supabase was unreachable at start)' : 'off (set SUPABASE_URL + SUPABASE_SECRET_KEY to turn on)'}\n`);
 });

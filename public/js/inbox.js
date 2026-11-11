@@ -74,7 +74,7 @@ const state = {
 // ---------------------------------------------------------------- views
 function show(view) { $$('[data-view]').forEach((v) => { v.hidden = v.dataset.view !== view; }); }
 
-// Which sign-in methods are on (Google via Firebase, the team password, or both).
+// Which sign-in methods are on (Google via Supabase, the team password, or both).
 let loginConfig = { googleSignIn: null, passwordLogin: true };
 const loginReady = fetch('/api/config').then((r) => r.json()).then((c) => {
   loginConfig = c;
@@ -83,41 +83,63 @@ const loginReady = fetch('/api/config').then((r) => r.json()).then((c) => {
   $('[data-password]').hidden = !c.passwordLogin;
 }).catch(() => {});
 
-let firebaseAuth = null;
-async function getFirebaseAuth() {
-  if (firebaseAuth) return firebaseAuth;
-  const fb = await import('/vendor/firebase-auth.js');
-  const app = fb.initializeApp(loginConfig.googleSignIn);
-  const auth = fb.getAuth(app);
-  await fb.setPersistence(auth, fb.browserSessionPersistence);
-  firebaseAuth = { fb, auth };
-  return firebaseAuth;
-}
+// ---- Google sign-in through Supabase (PKCE redirect: works on phones, no pop-ups, no SDK) ----
+const PKCE_KEY = 'plumb.inbox.pkce';
+const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const redirectUrl = () => `${location.origin}/inbox`;
+
 $('[data-google-btn]').addEventListener('click', async (e) => {
   const btn = e.currentTarget; const err = $('[data-login-error]');
   err.textContent = ''; btn.disabled = true;
   try {
     await loginReady;
-    const { fb, auth } = await getFirebaseAuth();
-    const provider = new fb.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    const cred = await fb.signInWithPopup(auth, provider);
-    const idToken = await cred.user.getIdToken();
-    fb.signOut(auth).catch(() => {}); // we only need Google to prove who you are once
-    const res = await fetch('/api/login/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, name: $('[data-login]').name.value.trim() }) });
-    const data = await res.json();
+    const cfg = loginConfig.googleSignIn;
+    if (!cfg) throw new Error('Google sign-in is not set up yet.');
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+    const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+    sessionStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, name: $('[data-login]').name.value.trim(), at: Date.now() }));
+    const q = new URLSearchParams({ provider: 'google', redirect_to: redirectUrl(), code_challenge: challenge, code_challenge_method: 's256', prompt: 'select_account' });
+    location.assign(`${cfg.url}/auth/v1/authorize?${q}`);
+  } catch (ex) { err.textContent = ex.message || 'Could not start Google sign-in.'; btn.disabled = false; }
+});
+
+// Back from Google: /inbox?code=… (or ?error=…). Swap the one-time code for a token, then sign in here.
+async function finishGoogleSignIn() {
+  const qs = new URLSearchParams(location.search);
+  const hs = new URLSearchParams(location.hash.slice(1));
+  const code = qs.get('code');
+  const errDesc = qs.get('error_description') || hs.get('error_description') || qs.get('error') || hs.get('error');
+  if (!code && !errDesc) return false;
+  history.replaceState(null, '', '/inbox'); // never leave the code in the address bar or history
+  const err = $('[data-login-error]');
+  show('login');
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(PKCE_KEY) || 'null'); } catch { return null; } })();
+  sessionStorage.removeItem(PKCE_KEY);
+  if (errDesc) { err.textContent = `Google sign-in was cancelled or failed: ${errDesc.replace(/\+/g, ' ')}`; return true; }
+  if (!saved?.verifier || Date.now() - saved.at > 15 * 60_000) { err.textContent = 'That sign-in link expired. Click "Continue with Google" again.'; return true; }
+  const btn = $('[data-google-btn]'); btn.disabled = true;
+  err.textContent = 'Signing you in…';
+  try {
+    await loginReady;
+    const cfg = loginConfig.googleSignIn;
+    if (!cfg) throw new Error('Google sign-in is not set up.');
+    const tr = await fetch(`${cfg.url}/auth/v1/token?grant_type=pkce`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: cfg.key },
+      body: JSON.stringify({ auth_code: code, code_verifier: saved.verifier }),
+    });
+    const tok = await tr.json().catch(() => ({}));
+    if (!tr.ok || !tok.access_token) throw new Error(tok.error_description || tok.msg || 'Google sign-in could not be completed. Try again.');
+    const res = await fetch('/api/login/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessToken: tok.access_token, name: saved.name || '' }) });
+    const data = await res.json().catch(() => ({}));
+    // We only needed Supabase to prove who you are; end that session (best effort).
+    fetch(`${cfg.url}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: cfg.key, Authorization: `Bearer ${tok.access_token}` } }).catch(() => {});
     if (!res.ok) throw new Error(data.error || 'Could not sign in.');
+    err.textContent = '';
     state.auth = data; localStorage.setItem(AUTH_KEY, JSON.stringify(data));
     start();
-  } catch (ex) {
-    const code = ex?.code || '';
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') err.textContent = '';
-    else if (code === 'auth/popup-blocked') err.textContent = 'Your browser blocked the Google window. Allow pop-ups for this site and try again.';
-    else if (code === 'auth/unauthorized-domain') err.textContent = 'This domain is not on the Firebase "Authorized domains" list yet.';
-    else if (code === 'auth/network-request-failed') err.textContent = 'Network problem. Check your connection and try again.';
-    else err.textContent = ex.message?.replace(/^Firebase: /, '') || 'Could not sign in.';
-  } finally { btn.disabled = false; }
-});
+  } catch (ex) { err.textContent = ex.message; } finally { btn.disabled = false; }
+  return true;
+}
 
 $('[data-login]').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -155,6 +177,11 @@ notifyBtn.addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------- list
+function previewText(c) {
+  const body = c.lastBody || '';
+  if (body.startsWith('File: ')) return `${c.lastSender === 'agent' ? 'Team sent' : 'Sent'} a file: ${body.slice(6)}`;
+  return `${c.lastSender === 'agent' ? 'Team: ' : ''}${body}`;
+}
 function renderList() {
   const list = $('[data-list]');
   const q = state.query.toLowerCase();
@@ -173,7 +200,7 @@ function renderList() {
     el('span', { class: `ib-avatar${c.online ? ' is-online' : ''}`, text: initials(c.name || c.email) || '•' }),
     el('span', { class: 'ib-item-name' }, displayName(c), c.topic ? el('span', { class: 'ib-tag', text: c.topic }) : null),
     el('span', { class: 'ib-item-time', text: relTime(c.lastMessageAt) }),
-    el('span', { class: `ib-item-preview${typing ? ' is-typing' : ''}`, text: typing ? 'typing…' : `${c.lastSender === 'agent' ? 'Team: ' : ''}${c.lastBody || ''}` }),
+    el('span', { class: `ib-item-preview${typing ? ' is-typing' : ''}`, text: typing ? 'typing…' : previewText(c) }),
     c.unread ? el('span', { class: 'ib-badge', text: String(c.unread) }) : null);
   }));
   const total = all.reduce((n, c) => n + (c.unread || 0), 0);
@@ -457,4 +484,4 @@ function start() {
   });
 }
 
-if (state.auth?.token) start(); else show('login');
+finishGoogleSignIn().then((handled) => { if (handled) return; if (state.auth?.token) start(); else show('login'); });

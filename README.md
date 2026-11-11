@@ -46,12 +46,12 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 | `SESSION_DAYS` | `14` | How long an inbox sign-in lasts (1–90). |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | |
 | `DB_FILE` | `.data/chat.db` | |
-| `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID` | none | Turns on **Google sign-in** for the inbox (free Firebase Spark plan). See [SETUP.md](SETUP.md). |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | none | Turns on **Google sign-in** for the inbox through Supabase Auth (free, no card). See [SETUP.md](SETUP.md). |
 | `TEAM_EMAILS` | none | Who may sign in with Google: `a@gmail.com, b@gmail.com` or `@yourcompany.com`. |
 | `ALLOW_PASSWORD_LOGIN` | auto | Password sign-in is on unless Google sign-in is configured. Set `true` to keep both. |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | none | Turns on Cloudflare R2: **file sharing** in the chat and **automatic database backups and restore**. See [SETUP.md](SETUP.md). |
-| `R2_MONTHLY_WRITE_CAP` / `R2_MONTHLY_READ_CAP` / `STORAGE_CAP_MB` | `300000` / `3000000` / `5000` | Self-imposed caps, far below R2's free tier. File sharing pauses when one is reached. |
-| `FILE_MAX_MB` / `UPLOADS_PER_DAY` / `FILE_UPLOADS` | `10` / `300` / on | Upload limits. `FILE_UPLOADS=off` keeps R2 for backups only. |
+| `SUPABASE_SECRET_KEY` | none | Server-only key. Turns on **file sharing** in the chat and **automatic database backups and restore** in a private Supabase Storage bucket (`SUPABASE_BUCKET`, default `chat`, created automatically). |
+| `STORAGE_CAP_MB` / `EGRESS_CAP_MB` | `800` / `3500` | Self-imposed stops under Supabase Free (1 GB stored, 5 GB downloads a month). File sharing pauses when one is reached. |
+| `FILE_MAX_MB` / `UPLOADS_PER_DAY` / `FILE_UPLOADS` | `10` / `300` / on | Upload limits. `FILE_UPLOADS=off` keeps Supabase for backups only. |
 | `BACKUP_INTERVAL_SEC` / `BACKUP_KEEP_DAYS` | `180` / `14` | How often to back up (only when something changed) and how many daily copies to keep. |
 
 ## Before launch

@@ -127,7 +127,7 @@ function inlineScriptHashes(publicDir) {
 export function securityHeaders({ publicDir, production, extra = () => null }) {
   const scriptHashes = inlineScriptHashes(publicDir).join(' ');
   const cache = new Map();
-  // extra(req) can add sources per page, e.g. the R2 file host for images, or Google sign-in on /inbox.
+  // extra(req) can add sources per page, e.g. the Supabase file host for images, or Supabase sign-in on /inbox.
   function buildCsp(x = {}) {
     const key = JSON.stringify(x);
     if (cache.has(key)) return cache.get(key);

@@ -1,5 +1,5 @@
 // Shared by the visitor chat and the team inbox: preparing, uploading and showing file attachments.
-// Files go to the server (which checks them) and are stored privately in Cloudflare R2. They are shown
+// Files go to the server (which checks them) and are stored privately in Supabase Storage. They are shown
 // through short-lived private links that the server hands out only to people in the conversation.
 
 const MB = 1024 * 1024;
