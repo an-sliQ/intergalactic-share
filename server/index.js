@@ -12,6 +12,10 @@ import {
   makeClientIp, rateKey, makeLimiter, cleanText, EMAIL_RE, UUID_RE, isPlainObject,
   webhookSafe, securityHeaders, makeOriginCheck,
 } from './security.js';
+import { makeR2 } from './r2.js';
+import { restoreIfMissing, startBackups } from './backup.js';
+import { makeFirebaseAuth } from './auth.js';
+import { sniff, safeFileName, ACCEPT } from './files.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -33,16 +37,35 @@ const CLIENT_IP_HEADER = env.CLIENT_IP_HEADER || '';
 const ALLOWED_ORIGINS = [PUBLIC_URL, ...(env.ALLOWED_ORIGINS || '').split(',')].map((s) => s.trim()).filter(Boolean);
 const SESSION_DAYS = Math.min(Math.max(Number(env.SESSION_DAYS) || 14, 1), 90);
 
-if (PRODUCTION && (!env.INBOX_PASSWORD || INBOX_PASSWORD === DEMO_PASSWORD || INBOX_PASSWORD.length < 12)) {
-  console.error('\n  ✖  Refusing to start: set INBOX_PASSWORD to a private password of at least 12 characters.\n');
+// Optional services (each stays off until its settings are present).
+const firebase = makeFirebaseAuth(env);
+const r2 = makeR2(env);
+const PASSWORD_LOGIN = env.ALLOW_PASSWORD_LOGIN === 'true' ? true : env.ALLOW_PASSWORD_LOGIN === 'false' ? false : !firebase.enabled;
+const FILES_ENABLED = r2.enabled && env.FILE_UPLOADS !== 'off';
+const FILE_MAX_MB = Math.min(Math.max(Number(env.FILE_MAX_MB) || 10, 1), 25);
+const UPLOADS_PER_DAY = Math.max(Number(env.UPLOADS_PER_DAY) || 300, 1);
+const BACKUP_INTERVAL_SEC = Math.max(Number(env.BACKUP_INTERVAL_SEC) || 180, 30);
+const BACKUP_KEEP_DAYS = Math.min(Math.max(Number(env.BACKUP_KEEP_DAYS) || 14, 1), 90);
+
+if (PRODUCTION && PASSWORD_LOGIN && (!env.INBOX_PASSWORD || INBOX_PASSWORD === DEMO_PASSWORD || INBOX_PASSWORD.length < 12)) {
+  console.error('\n  ✖  Refusing to start: set INBOX_PASSWORD to a private password of at least 12 characters (or turn on Google sign-in).\n');
   process.exit(1);
 }
-if (!env.INBOX_PASSWORD) console.warn(`\n  ⚠  INBOX_PASSWORD is not set. Using the demo password "${DEMO_PASSWORD}". Set it before going live.\n`);
-else if (INBOX_PASSWORD.length < 12) console.warn('\n  ⚠  INBOX_PASSWORD is short. Use 12+ characters.\n');
+if (PRODUCTION && !PASSWORD_LOGIN && !firebase.enabled) {
+  console.error('\n  ✖  Refusing to start: no way to sign in to the inbox. Set the FIREBASE_* settings or ALLOW_PASSWORD_LOGIN=true.\n');
+  process.exit(1);
+}
+if (PASSWORD_LOGIN && !env.INBOX_PASSWORD) console.warn(`\n  ⚠  INBOX_PASSWORD is not set. Using the demo password "${DEMO_PASSWORD}". Set it before going live.\n`);
+else if (PASSWORD_LOGIN && INBOX_PASSWORD.length < 12) console.warn('\n  ⚠  INBOX_PASSWORD is short. Use 12+ characters.\n');
+if (firebase.enabled && !firebase.teamConfigured) console.warn('\n  ⚠  Google sign-in is on but TEAM_EMAILS is empty, so nobody can sign in with Google yet.\n');
 if (PRODUCTION && !env.SESSION_SECRET) console.warn('\n  ⚠  SESSION_SECRET is not set: the team will be signed out on every restart.\n');
 if (env.NOTIFY_WEBHOOK_URL && !NOTIFY_WEBHOOK_URL) console.warn('\n  ⚠  NOTIFY_WEBHOOK_URL must start with https:// — notifications are off.\n');
 
+// On free hosting the disk starts empty: bring the database back from R2 before opening it.
+const restore = await restoreIfMissing({ r2, dbFile: DB_FILE });
 const db = openDb(DB_FILE);
+r2.attachDb(db);
+const backups = startBackups({ r2, db, intervalSec: BACKUP_INTERVAL_SEC, keepDays: BACKUP_KEEP_DAYS, safeToBackUp: restore.safeToBackUp });
 const clientIp = makeClientIp({ header: CLIENT_IP_HEADER, hops: TRUST_PROXY });
 const allow = makeLimiter();
 const originOk = makeOriginCheck({ allowed: ALLOWED_ORIGINS, production: PRODUCTION });
@@ -57,7 +80,10 @@ const LIMITS = {
   newConvPerIp:     { capacity: 4,   refillPerSec: 1 / 120 },
   newConvGlobal:    { capacity: 60,  refillPerSec: 1 / 20 },   // a burst of 60, then 3 a minute site-wide
   agentMessage:     { capacity: 30,  refillPerSec: 2 },
+  uploadPerIp:      { capacity: 10,  refillPerSec: 20 / 3600 },  // 10 at once, then 20 an hour
+  fileUrlPerSocket: { capacity: 60,  refillPerSec: 1 },
 };
+const MAX_FILES_PER_CONVERSATION_PER_DAY = 30;
 const MAX_SOCKETS_PER_IP = 25;
 const MAX_MESSAGES_PER_CONVERSATION = 1500;
 const MAX_BODY = 4000;
@@ -72,8 +98,10 @@ const noop = () => {};
 
 // Sessions are bound to the current password: changing INBOX_PASSWORD signs everyone out.
 const PASSWORD_VERSION = createHmac('sha256', SESSION_SECRET).update(`pv:${INBOX_PASSWORD}`).digest('base64url').slice(0, 16);
-function signAgent(name) {
-  const payload = Buffer.from(JSON.stringify({ n: name, pv: PASSWORD_VERSION, exp: Date.now() + SESSION_DAYS * 86400_000 })).toString('base64url');
+// Password sessions are bound to the password; Google sessions are bound to the email staying on TEAM_EMAILS.
+function signAgent(name, email = null) {
+  const data = email ? { n: name, e: email } : { n: name, pv: PASSWORD_VERSION };
+  const payload = Buffer.from(JSON.stringify({ ...data, exp: Date.now() + SESSION_DAYS * 86400_000 })).toString('base64url');
   const sig = createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
@@ -86,14 +114,20 @@ function verifyAgent(token) {
   if (!safeEqual(sig, expected)) return null;
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    if (data.pv !== PASSWORD_VERSION || !(data.exp > Date.now()) || typeof data.n !== 'string') return null;
-    return { name: data.n, exp: data.exp };
+    if (!(data.exp > Date.now()) || typeof data.n !== 'string') return null;
+    if (data.e) { if (!firebase.enabled || !firebase.isTeam(data.e)) return null; }
+    else if (!PASSWORD_LOGIN || data.pv !== PASSWORD_VERSION) return null;
+    return { name: data.n, email: data.e || null, exp: data.exp };
   } catch { return null; }
 }
 
 function publicMessage(m) {
-  return { id: m.id, conversationId: m.conversation_id, sender: m.sender, agentName: m.agent_name, body: m.body, createdAt: m.created_at, readAt: m.read_at };
+  return {
+    id: m.id, conversationId: m.conversation_id, sender: m.sender, agentName: m.agent_name, body: m.body, createdAt: m.created_at, readAt: m.read_at,
+    attachment: m.att_id ? { id: m.att_id, name: m.att_name, mime: m.att_mime, kind: m.att_kind, size: m.att_size } : null,
+  };
 }
+const features = () => ({ files: FILES_ENABLED, fileMaxMb: FILE_MAX_MB, accept: ACCEPT });
 function publicConversation(c) {
   if (!c) return null;
   return {
@@ -122,7 +156,16 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', false); // client IPs come from clientIp() only, never from a forgeable header
 app.set('etag', 'strong');
-app.use(securityHeaders({ publicDir: PUBLIC_DIR, production: PRODUCTION }));
+const isInboxPath = (p) => p === '/inbox' || p === '/inbox.html';
+app.use(securityHeaders({
+  publicDir: PUBLIC_DIR,
+  production: PRODUCTION,
+  extra: (req) => {
+    const x = { img: r2.enabled ? [r2.origin] : [] };
+    if (isInboxPath(req.path) && firebase.csp) Object.assign(x, firebase.csp, { popups: true });
+    return x;
+  },
+}));
 
 app.post('/api/login', express.json({ limit: '4kb', strict: true }), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -131,6 +174,7 @@ app.post('/api/login', express.json({ limit: '4kb', strict: true }), async (req,
   if (!allow(`login:${ip}`, LIMITS.loginPerIp) || !allow('login:global', LIMITS.loginGlobal)) {
     return res.status(429).json({ error: 'Too many attempts. Wait a minute and try again.' });
   }
+  if (!PASSWORD_LOGIN) return res.status(403).json({ error: 'Password sign-in is turned off. Use Google sign-in.' });
   const body = isPlainObject(req.body) ? req.body : {};
   const name = cleanText(body.name, 40);
   const password = typeof body.password === 'string' ? body.password.slice(0, 256) : '';
@@ -142,6 +186,120 @@ app.post('/api/login', express.json({ limit: '4kb', strict: true }), async (req,
   }
   res.json({ token: signAgent(name), name });
 });
+// What the inbox login screen should offer. Firebase web config is public by design.
+app.get('/api/config', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ googleSignIn: firebase.publicConfig, passwordLogin: PASSWORD_LOGIN });
+});
+
+app.post('/api/login/google', express.json({ limit: '8kb', strict: true }), async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const ip = rateKey(clientIp(req.headers, req.socket.remoteAddress));
+  if (!originOk(req.headers)) return res.status(403).json({ error: 'Blocked.' });
+  if (!firebase.enabled) return res.status(404).json({ error: 'Google sign-in is not set up.' });
+  if (!allow(`login:${ip}`, LIMITS.loginPerIp) || !allow('login:global', LIMITS.loginGlobal)) {
+    return res.status(429).json({ error: 'Too many attempts. Wait a minute and try again.' });
+  }
+  const body = isPlainObject(req.body) ? req.body : {};
+  let who;
+  try { who = await firebase.verifyIdToken(body.idToken); } catch (e) {
+    console.warn(`Rejected Google sign-in from ${ip}: ${e.code || e.message}`);
+    return res.status(401).json({ error: 'Google sign-in could not be verified. Try again.' });
+  }
+  if (!who.email || !who.emailVerified) return res.status(403).json({ error: 'Use a Google account with a verified email address.' });
+  if (!firebase.isTeam(who.email)) {
+    console.warn(`Google sign-in from ${who.email} (${ip}) refused: not on TEAM_EMAILS`);
+    return res.status(403).json({ error: `${who.email} is not on the team list. Ask the owner to add it to TEAM_EMAILS.` });
+  }
+  const name = cleanText(body.name, 40) || cleanText(who.name.split(' ')[0], 40) || who.email.split('@')[0].slice(0, 40);
+  res.json({ token: signAgent(name, who.email), name, email: who.email });
+});
+
+// File upload: the server checks who is uploading BEFORE reading the body, checks the real file type
+// from its bytes, keeps every free-tier cap, then stores it privately in R2.
+const uploadDay = { day: '', count: 0 };
+function uploadAuth(req, res, next) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!FILES_ENABLED) return res.status(404).json({ error: 'File sharing is not turned on.' });
+  if (!originOk(req.headers)) return res.status(403).json({ error: 'Blocked.' });
+  const ip = rateKey(clientIp(req.headers, req.socket.remoteAddress));
+  const len = Number(req.headers['content-length']);
+  if (!Number.isFinite(len) || len <= 0) return res.status(411).json({ error: 'Empty file.' });
+  if (len > FILE_MAX_MB * 1024 * 1024) return res.status(413).json({ error: `Files can be up to ${FILE_MAX_MB} MB.` });
+  const convId = String(req.headers['x-conversation-id'] || '');
+  if (!UUID_RE.test(convId)) return res.status(400).json({ error: 'Bad request.' });
+  const conv = db.getConversation(convId);
+  if (!conv) return res.status(404).json({ error: 'Conversation not found.' });
+
+  const auth = String(req.headers.authorization || '');
+  if (auth.startsWith('Bearer ')) {
+    const agent = verifyAgent(auth.slice(7));
+    if (!agent) return res.status(401).json({ error: 'Sign in again.' });
+    req.uploader = { role: 'agent', name: agent.name };
+  } else {
+    const token = String(req.headers['x-conversation-token'] || '');
+    if (!token || token.length > 128 || !safeEqual(conv.token_hash, sha256(token))) return res.status(401).json({ error: 'Not allowed.' });
+    req.uploader = { role: 'visitor' };
+  }
+  if (!allow(`upload:${req.uploader.role === 'agent' ? 'a:' + req.uploader.name : ip}`, LIMITS.uploadPerIp)) {
+    return res.status(429).json({ error: 'You are sending files very quickly. Try again in a few minutes.' });
+  }
+  if (db.attachmentCountSince(convId, Date.now() - 86400_000) >= MAX_FILES_PER_CONVERSATION_PER_DAY) {
+    return res.status(429).json({ error: 'This conversation has reached today\'s file limit. Please email larger batches.' });
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  if (uploadDay.day !== today) { uploadDay.day = today; uploadDay.count = 0; }
+  if (uploadDay.count >= UPLOADS_PER_DAY) return res.status(429).json({ error: 'File sharing is paused for today. Please email the file instead.' });
+  if (db.attachmentBytes() + backups.bytesStored() + len > r2.limits.storageBytes) {
+    return res.status(507).json({ error: 'File storage is full. Please email the file instead.' });
+  }
+  // Keep ~7% of the monthly write budget for database backups, which matter more than files.
+  if (!r2.canWrite(1 + Math.floor(r2.limits.writesPerMonth * 0.07))) return res.status(503).json({ error: 'File sharing is paused for this month. Please email the file instead.' });
+  req.conv = conv;
+  next();
+}
+
+app.post('/api/files', uploadAuth, express.raw({ type: () => true, limit: `${FILE_MAX_MB}mb` }), async (req, res) => {
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || !buf.length) return res.status(400).json({ error: 'Empty file.' });
+  let rawName = '';
+  try { rawName = decodeURIComponent(String(req.headers['x-file-name'] || '')); } catch { rawName = ''; }
+  const type = sniff(buf, rawName);
+  if (!type) return res.status(415).json({ error: 'That file type is not supported. Send images, PDFs, Word, Excel, PowerPoint, text or short videos.' });
+  const name = safeFileName(rawName, type.ext);
+  const id = randomUUID();
+  const key = `files/${req.conv.id}/${id}`;
+  try {
+    await r2.put(key, buf, {
+      contentType: type.mime,
+      contentDisposition: type.kind === 'image' ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+    });
+  } catch (e) {
+    console.error('Upload to R2 failed:', e.message);
+    return res.status(e.code === 'R2_CAP' ? 503 : 502).json({ error: 'Could not store the file. Please try again or email it.' });
+  }
+  uploadDay.count += 1;
+  let row;
+  try {
+    row = db.addAttachmentMessage({
+      conversationId: req.conv.id, sender: req.uploader.role, agentName: req.uploader.name,
+      attachment: { id, key, name, mime: type.mime, kind: type.kind, size: buf.length },
+    });
+  } catch (e) {
+    r2.del(key).catch(() => {});
+    console.error('Saving attachment failed:', e);
+    return res.status(500).json({ error: 'Could not save the file.' });
+  }
+  const msg = publicMessage(row);
+  res.json({ ok: true, message: msg });
+  // The uploading tab already has the message from this response; don't send it to that tab twice.
+  const sid = String(req.headers['x-socket-id'] || '');
+  const s = sid.length < 64 ? io.sockets.sockets.get(sid) : null;
+  const own = s && ((req.uploader.role === 'visitor' && s.data.conversationId === req.conv.id) || (req.uploader.role === 'agent' && s.data.role === 'agent')) ? s : null;
+  if (req.uploader.role === 'visitor') afterVisitorMessage(req.conv.id, msg, own, { isNew: false, preview: `File: ${name}` });
+  else afterAgentMessage(req.conv.id, msg, req.uploader.name, own);
+});
+
 app.all('/api/*', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.get('/healthz', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ ok: true }); });
@@ -279,6 +437,52 @@ function joinVisitorRoom(socket, id) {
   if (!wasOnline) io.to('agents').emit('visitor:presence', { conversationId: id, online: true });
 }
 
+// Fan a visitor message out: their other tabs, the team, the first-message notice, and the webhook.
+function afterVisitorMessage(convId, msg, fromSocket, { isNew, preview }) {
+  (fromSocket ? fromSocket.to(`c:${convId}`) : io.to(`c:${convId}`)).emit('message', msg);
+  io.to('agents').emit('message', msg);
+  if (db.visitorMessageCount(convId) === 1) {
+    const p = presence();
+    const text = p.online
+      ? `Delivered. ${p.agents[0] ?? 'Someone on the team'} has been notified and will reply right here.`
+      : 'Delivered. The team is away right now. Leave your email below and we will reply by email as soon as we are back, usually within a few hours.';
+    const sys = publicMessage(db.addMessage({ conversationId: convId, sender: 'system', body: text }));
+    setTimeout(() => io.to(`c:${convId}`).emit('message', sys), 450);
+  }
+  emitConversation(convId);
+  const c = db.getConversation(convId);
+  const who = webhookSafe(c.name || c.email || 'A visitor');
+  const quote = webhookSafe(String(preview).slice(0, 180).replace(/\s+/g, ' '));
+  const link = PUBLIC_URL ? ` ${PUBLIC_URL}/inbox#${convId}` : '';
+  if (isNew) notify(`💬 New chat from ${who}: "${quote}"${link}`);
+  else if (!presence().online) notify(`💬 ${who}: "${quote}"${link}`);
+}
+function afterAgentMessage(convId, msg, name, fromSocket) {
+  io.to(`c:${convId}`).emit('message', msg);
+  io.to(`c:${convId}`).emit('typing', { from: 'agent', typing: false, name });
+  (fromSocket ? fromSocket.to('agents') : io.to('agents')).emit('message', msg);
+  emitConversation(convId);
+}
+
+// Short-lived private link to one attachment, only for people in that conversation.
+async function fileUrl(socket, p, ack) {
+  if (!FILES_ENABLED) return ack({ error: 'Files are off.' });
+  if (!allow(`furl:${socket.id}`, LIMITS.fileUrlPerSocket)) return ack({ error: 'Slow down.' });
+  const id = typeof p.id === 'string' && UUID_RE.test(p.id) ? p.id : null;
+  const att = id && db.getAttachment(id);
+  if (!att) return ack({ error: 'Not found' });
+  if (socket.data.role !== 'agent' && att.conversation_id !== socket.data.conversationId) return ack({ error: 'Not found' });
+  try {
+    const expiresSec = 1800;
+    const url = await r2.presignGet(att.object_key, {
+      expiresSec, filename: att.name, contentType: att.mime, inline: att.kind === 'image' || att.mime === 'application/pdf',
+    });
+    ack({ ok: true, url, expiresAt: Date.now() + (expiresSec - 60) * 1000 });
+  } catch (e) {
+    ack({ error: e.code === 'R2_CAP' ? 'File viewing is paused for this month.' : 'Could not open the file.' });
+  }
+}
+
 function handleVisitor(socket) {
   socket.join('visitors');
   const ip = socket.data.ip;
@@ -292,6 +496,7 @@ function handleVisitor(socket) {
     conversation: conv ? { name: conv.name, email: conv.email, topic: conv.topic } : null,
     messages: id ? db.listMessages(id).map(publicMessage) : [],
     presence: presence(),
+    features: features(),
   });
 
   let contextUpdates = 0;
@@ -328,25 +533,7 @@ function handleVisitor(socket) {
 
     const msg = publicMessage(db.addMessage({ conversationId: convId, sender: 'visitor', body }));
     ack({ ok: true, message: msg, conversationId: convId, token });
-    socket.to(`c:${convId}`).emit('message', msg); // other tabs of the same visitor
-    io.to('agents').emit('message', msg);
-
-    if (db.visitorMessageCount(convId) === 1) {
-      const p = presence();
-      const text = p.online
-        ? `Delivered. ${p.agents[0] ?? 'Someone on the team'} has been notified and will reply right here.`
-        : 'Delivered. The team is away right now. Leave your email below and we will reply by email as soon as we are back, usually within a few hours.';
-      const sys = publicMessage(db.addMessage({ conversationId: convId, sender: 'system', body: text }));
-      setTimeout(() => io.to(`c:${convId}`).emit('message', sys), 450);
-    }
-    emitConversation(convId);
-
-    const c = db.getConversation(convId);
-    const who = webhookSafe(c.name || c.email || 'A visitor');
-    const quote = webhookSafe(body.slice(0, 180).replace(/\s+/g, ' '));
-    const link = PUBLIC_URL ? ` ${PUBLIC_URL}/inbox#${convId}` : '';
-    if (isNew) notify(`💬 New chat from ${who}: "${quote}"${link}`);
-    else if (!presence().online) notify(`💬 ${who}: "${quote}"${link}`);
+    afterVisitorMessage(convId, msg, socket, { isNew, preview: body });
   });
 
   on(socket, 'profile', (p, ack) => {
@@ -366,6 +553,8 @@ function handleVisitor(socket) {
     const convId = socket.data.conversationId;
     if (convId) io.to('agents').emit('typing', { conversationId: convId, from: 'visitor', typing: raw === true });
   });
+
+  on(socket, 'file:url', (p, ack) => fileUrl(socket, p, ack));
 
   on(socket, 'read', () => {
     const convId = socket.data.conversationId;
@@ -393,7 +582,7 @@ function handleAgent(socket) {
   socket.join('agents');
   broadcastPresence();
 
-  socket.emit('ready', { name, conversations: db.listConversations().map(publicConversation), presence: presence() });
+  socket.emit('ready', { name, conversations: db.listConversations().map(publicConversation), presence: presence(), features: features() });
 
   const convIdFrom = (v) => (typeof v === 'string' && UUID_RE.test(v) ? v : null);
 
@@ -415,11 +604,10 @@ function handleAgent(socket) {
     db.markRead(id, 'visitor');
     const msg = publicMessage(db.addMessage({ conversationId: id, sender: 'agent', agentName: name, body }));
     ack({ ok: true, message: msg });
-    io.to(`c:${id}`).emit('message', msg);
-    io.to(`c:${id}`).emit('typing', { from: 'agent', typing: false, name });
-    socket.to('agents').emit('message', msg);
-    emitConversation(id);
+    afterAgentMessage(id, msg, name, socket);
   });
+
+  on(socket, 'file:url', (p, ack) => fileUrl(socket, p, ack));
 
   on(socket, 'typing', (p) => {
     const id = convIdFrom(p.conversationId);
@@ -450,17 +638,25 @@ process.on('unhandledRejection', (e) => console.error('Unhandled rejection:', e)
 
 // Clean shutdown on deploys/restarts: stop accepting, tell clients to reconnect, close the database.
 let stopping = false;
-function shutdown(signal) {
+async function shutdown(signal) {
   if (stopping) return; stopping = true;
   console.log(`${signal} received, shutting down…`);
+  setTimeout(() => process.exit(0), 15000).unref();
   io.close();
-  server.close(() => { try { db.close(); } catch {} process.exit(0); });
-  setTimeout(() => process.exit(0), 8000).unref();
+  server.close();
+  try {
+    if (backups.enabled && await Promise.race([backups.final(), new Promise((r) => setTimeout(() => r('timeout'), 12000))]) === true) console.log('  ↑  Final backup saved to R2.');
+  } catch (e) { console.warn('Final backup failed:', e.message); }
+  try { db.close(); } catch {}
+  process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 server.listen(PORT, HOST, () => {
   console.log(`\n  Contact page  → http://localhost:${PORT}/`);
-  console.log(`  Team inbox    → http://localhost:${PORT}/inbox\n`);
+  console.log(`  Team inbox    → http://localhost:${PORT}/inbox`);
+  console.log(`  Sign-in       → ${[firebase.enabled && 'Google (Firebase)', PASSWORD_LOGIN && 'team password'].filter(Boolean).join(' + ')}`);
+  console.log(`  Files         → ${FILES_ENABLED ? `on, up to ${FILE_MAX_MB} MB, ${r2.describe()}` : 'off (set the R2_* settings to turn on)'}`);
+  console.log(`  Backups       → ${backups.enabled ? `to R2 every ${BACKUP_INTERVAL_SEC}s when something changed, ${BACKUP_KEEP_DAYS} daily copies kept` : r2.enabled ? 'OFF this run (R2 was unreachable at start)' : 'off (set the R2_* settings to turn on)'}\n`);
 });

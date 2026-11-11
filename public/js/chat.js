@@ -1,4 +1,5 @@
 // Live chat, visitor side. One panel that lives in the page (#chat-slot) or the floating drawer.
+import { prepareFile, uploadFile, makeUrlCache, attachmentNode, uploadingNode, wireFileInputs, ICON_CLIP } from './attachments.js';
 const TEAM_NAME = 'Plumb team';
 const STORE_KEY = 'plumb.chat.v1';
 const QUICK_STARTS = [
@@ -66,6 +67,7 @@ const state = {
   mode: 'inline',
   unread: 0,
   pending: new Map(),
+  features: { files: false, fileMaxMb: 10, accept: '' },
 };
 
 // ---------------------------------------------------------------- DOM
@@ -86,8 +88,12 @@ function buildPanel() {
   ui.input = el('textarea', { id: 'lc-input', rows: '1', placeholder: 'Write a message…', maxlength: '4000', autocomplete: 'off', enterkeyhint: 'send' });
   ui.send = el('button', { class: 'lc-send', type: 'submit', 'aria-label': 'Send message', disabled: true });
   ui.send.append(svg(ICON_SEND));
+  ui.file = el('input', { type: 'file', class: 'sr-only', tabindex: '-1', 'aria-hidden': 'true', multiple: true });
+  ui.attach = el('button', { class: 'lc-attach', type: 'button', 'aria-label': 'Attach a file', title: 'Attach a file', hidden: true, onclick: () => ui.file.click() });
+  ui.attach.append(svg(ICON_CLIP));
+  ui.file.addEventListener('change', () => { const f = [...ui.file.files]; ui.file.value = ''; sendFiles(f); });
   ui.form = el('form', { class: 'lc-compose', novalidate: true },
-    el('label', { class: 'sr-only', for: 'lc-input', text: 'Message' }), ui.input, ui.send);
+    el('label', { class: 'sr-only', for: 'lc-input', text: 'Message' }), ui.attach, ui.file, ui.input, ui.send);
   ui.panel = el('div', { class: 'lc', 'data-mode': 'inline' },
     el('header', { class: 'lc-head' }, ui.avatars,
       el('div', { class: 'lc-title' }, el('strong', { text: TEAM_NAME }), ui.status), ui.conn, ui.close),
@@ -103,6 +109,14 @@ function buildPanel() {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendFromInput(); }
   });
   ui.input.addEventListener('input', () => { autosize(); ui.send.disabled = !ui.input.value.trim(); signalTyping(); });
+  wireFileInputs({ dropZone: ui.panel, pasteTarget: ui.input, onFiles: sendFiles, enabled: () => state.features.files });
+}
+function applyFeatures(f) {
+  if (!f) return;
+  state.features = f;
+  ui.attach.hidden = !f.files;
+  ui.file.setAttribute('accept', f.accept || '');
+  ui.form.classList.toggle('has-attach', !!f.files);
 }
 function autosize() { ui.input.style.height = 'auto'; ui.input.style.height = Math.min(ui.input.scrollHeight, 160) + 'px'; }
 
@@ -153,7 +167,12 @@ function messageNode(m, prev) {
       m.sender === 'agent' ? el('b', { text: m.agentName || TEAM_NAME }) : 'You',
       ` · ${fmtTime(m.createdAt)}`));
   }
-  row.append(el('div', { class: 'lc-bubble' }, richText(m.body)));
+  if (m.uploading) {
+    m.uploadNode ||= uploadingNode(m.fileName);
+    row.append(el('div', { class: 'lc-bubble lc-bubble-att' }, m.uploadNode));
+  } else if (m.attachment) {
+    row.append(el('div', { class: `lc-bubble lc-bubble-att${m.attachment.kind === 'image' ? ' is-image' : ''}` }, attachmentNode(m.attachment, getFileUrl)));
+  } else row.append(el('div', { class: 'lc-bubble' }, richText(m.body)));
   return row;
 }
 
@@ -267,7 +286,59 @@ function deliver(m) {
     updateRow(m);
   });
 }
-function retry(m) { m.failed = false; m.pending = true; updateRow(m); deliver(m); }
+function retry(m) { m.failed = false; m.pending = true; updateRow(m); if (m.file) deliverFile(m); else deliver(m); }
+
+// ---------------------------------------------------------------- files
+const getFileUrl = makeUrlCache((id) => new Promise((resolve) => {
+  if (!state.socket?.connected) return resolve({ error: 'Offline' });
+  state.socket.timeout(8000).emit('file:url', { id }, (err, res) => resolve(err ? { error: 'Timed out' } : res));
+}));
+
+async function sendFiles(files) {
+  if (!state.features.files || !files.length) return;
+  if (!state.conversationId || !state.token) {
+    showSystem('Send a quick message first so we know what it’s about, then attach your files.');
+    ui.input.focus(); return;
+  }
+  for (const raw of files.slice(0, 5)) {
+    let file;
+    try { file = await prepareFile(raw, state.features.fileMaxMb); } catch (e) { showSystem(e.message); continue; }
+    const clientId = Math.random().toString(36).slice(2);
+    const m = { clientId, sender: 'visitor', body: '', createdAt: Date.now(), pending: true, uploading: true, file, fileName: file.name || 'file' };
+    state.messages.push(m);
+    appendMessage(m);
+    deliverFile(m);
+  }
+  if (files.length > 5) showSystem('You can send up to 5 files at a time.');
+}
+
+async function deliverFile(m) {
+  m.uploading = true;
+  replaceRow(m);
+  try {
+    const msg = await uploadFile({
+      file: m.file,
+      headers: { 'X-Conversation-Id': state.conversationId, 'X-Conversation-Token': state.token, 'X-Socket-Id': state.socket?.id },
+      onProgress: (p) => m.uploadNode?.setProgress(p),
+    });
+    if (state.messages.some((x) => x !== m && x.id === msg.id)) { state.messages = state.messages.filter((x) => x !== m); ui.thread.querySelector(`.lc-row[data-client="${m.clientId}"]`)?.remove(); renderTail(); return; }
+    Object.assign(m, msg, { pending: false, failed: false, uploading: false, file: null, uploadNode: null });
+  } catch (e) {
+    Object.assign(m, { pending: false, failed: true });
+    showSystem(e.message);
+  }
+  replaceRow(m);
+}
+function replaceRow(m) {
+  const row = ui.thread.querySelector(`.lc-row[data-client="${m.clientId}"]`);
+  if (!row) return;
+  const i = state.messages.indexOf(m);
+  const prev = i > 0 ? state.messages[i - 1] : null;
+  const node = messageNode(m, prev && prev.sender !== 'system' ? prev : null);
+  node.classList.toggle('is-failed', !!m.failed);
+  row.replaceWith(node);
+  renderTail();
+}
 function updateRow(m) {
   const row = ui.thread.querySelector(`.lc-row[data-client="${m.clientId}"]`);
   if (row) { row.classList.toggle('is-pending', !!m.pending); row.classList.toggle('is-failed', !!m.failed); if (m.id) row.dataset.id = m.id; }
@@ -410,6 +481,7 @@ function connect() {
 
   socket.on('session', (s) => {
     state.presence = s.presence;
+    applyFeatures(s.features);
     if (!s.conversationId && state.conversationId) { state.conversationId = null; state.token = null; saveStore({ conversationId: null, token: null }); }
     if (s.conversation) state.profile = { ...state.profile, ...s.conversation };
     // Keep unsent local messages when reconnecting.

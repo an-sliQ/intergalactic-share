@@ -1,10 +1,12 @@
 # Publishing on your domain
 
-The live chat needs a server that **stays running** and keeps WebSocket connections open, plus a disk that **keeps the chat history**. Static hosts (Netlify, GitHub Pages) and serverless hosts (Vercel functions) can't do that, so use one of the options below.
+The live chat needs a server that **stays running** and keeps WebSocket connections open, plus somewhere that **keeps the chat history**. Static hosts (Netlify, GitHub Pages) and serverless hosts (Vercel functions) can't do that, so use one of the options below.
+
+> **Want it completely free?** Follow **[SETUP.md](SETUP.md)**: Render Free + Firebase Google sign-in + Cloudflare R2 backups/files, step by step.
 
 | Option | Best for | Cost (approx.) | Effort |
 |---|---|---|---|
-| **A. Render** (recommended) | No server admin. Auto-deploys from GitHub, HTTPS included | ~$7/mo + $0.25/GB disk | 15 min |
+| **A. Render** (recommended) | No server admin. Auto-deploys from GitHub, HTTPS included | **Free** (sleeps when idle; history kept in R2, see SETUP.md). Starter $7/mo never sleeps | 15 min |
 | **B. VPS** (Hetzner, DigitalOcean, Hostinger…) | Cheapest at scale, full control | ~$4–6/mo | 30–45 min |
 | C. Railway / Fly.io / Coolify | Use the included `Dockerfile` and mount a volume at `/data` | ~$5/mo | 15 min |
 
@@ -17,13 +19,13 @@ The live chat needs a server that **stays running** and keeps WebSocket connecti
 ### 1. Deploy
 1. Sign in at **render.com** with GitHub.
 2. **New → Blueprint** → choose the `an-sliQ/intergalactic-share` repo and the branch with this code (or merge it into `main` first).
-3. Render reads `render.yaml` and asks for:
+3. Render reads `render.yaml` and asks for values. Leave the `FIREBASE_*`, `TEAM_EMAILS` and `R2_*` ones empty for now ([SETUP.md](SETUP.md) steps 1–2 cover them):
    - `INBOX_PASSWORD`: the team password for `/inbox`, at least 12 characters (the app won't start with a weak one).
    - `PUBLIC_URL`: `https://yourdomain.com` (or your subdomain).
    - `NOTIFY_WEBHOOK_URL`: optional Slack or Discord webhook. Leave it empty if you don't need one.
 4. Click **Apply**. In 2–3 minutes the site is live at `https://plumb-contact.onrender.com`. Open it and `/inbox` to check.
 
-`render.yaml` already sets the Singapore region (closest to India), the Starter plan, a 1 GB disk for chat history, a generated `SESSION_SECRET`, production security mode, real-visitor-IP detection, and health checks.
+`render.yaml` already sets the Singapore region (closest to India), the **Free** plan, a generated `SESSION_SECRET`, production security mode, real-visitor-IP detection, and health checks. The free plan has no disk, so chat history is restored from Cloudflare R2 on every start ([SETUP.md](SETUP.md), step 2).
 
 ### 2. Connect your domain
 1. In Render: your service → **Settings → Custom Domains → Add**. Enter `yourdomain.com` (Render adds `www` automatically) or your subdomain.
@@ -78,7 +80,7 @@ Open `https://yourdomain.com`; Caddy fetches the certificate on the first reques
 
 **Updating later:** `cd /opt/plumb && git pull && npm ci --omit=dev && chown -R plumb:plumb /opt/plumb && systemctl restart plumb`
 (If the repo is private, use a GitHub deploy key or a personal access token for the clone.)
-**Backups:** copy `/opt/plumb/.data/chat.db` (e.g. a nightly cron job).
+**Backups:** set the `R2_*` settings (see [SETUP.md](SETUP.md), step 2) for automatic off-site backups, or copy `/opt/plumb/.data/chat.db` with a nightly cron job.
 
 ---
 
@@ -87,6 +89,7 @@ Open `https://yourdomain.com`; Caddy fetches the certificate on the first reques
 - [ ] Read [SECURITY.md](SECURITY.md) → “Your part” (production mode, strong password, real-IP header for your host).
 
 - [ ] Replace **Plumb**, `hello@plumb.studio` and the placeholder client quotes in `public/index.html`. The chat's team name is `TEAM_NAME` in `public/js/chat.js`.
+- [ ] Optional free add-ons in [SETUP.md](SETUP.md): Google sign-in for the team, file sharing, automatic backups.
 - [ ] Open `/inbox` on your phone and laptop, sign in, and click **Turn on alerts**. Visitors see you as online whenever an inbox tab is open.
 - [ ] Optional: set `NOTIFY_WEBHOOK_URL` so new chats ping your Slack or Discord when nobody has the inbox open.
 - [ ] Send yourself a test message from another device.

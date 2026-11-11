@@ -93,6 +93,40 @@
 .lc-send:hover:not(:disabled){background:var(--ink);color:var(--acid)}
 .lc-send:hover:not(:disabled) svg{transform:translateX(3px)}
 .lc-send:disabled{background:var(--warm);color:#9a9e90;cursor:default}
+/* ---------- Attachments ---------- */
+.lc-attach{width:52px;flex-shrink:0;display:grid;place-items:center;background:transparent;border:0;border-right:1px solid #18191718;color:var(--muted);transition:color .3s var(--ease),background .3s var(--ease)}
+.lc-attach svg{width:20px;height:20px;transition:transform .5s var(--spring)}
+.lc-attach:hover{color:var(--ink);background:var(--paper)}
+.lc-attach:hover svg{transform:rotate(-12deg)}
+.lc-attach[hidden]{display:none}
+.lc-compose.has-attach textarea{padding-left:14px}
+.lc.is-dropping,.is-dropping{outline:2px dashed var(--ink);outline-offset:-8px}
+.lc.is-dropping .lc-thread,[data-thread].is-dropping .ib-messages{background:repeating-linear-gradient(-45deg,transparent 0 12px,#dce87a33 12px 24px)}
+.lc-bubble-att{padding:0;white-space:normal;background:transparent!important;border:0!important}
+.lc-att{display:block;text-decoration:none!important;color:inherit}
+.lc-att-img{position:relative;width:min(280px,62vw);min-height:120px;background:var(--warm);border:1px solid var(--ink);overflow:hidden}
+.lc-att-img img{display:block;width:100%;height:auto;max-height:340px;object-fit:cover;transition:opacity .5s var(--ease),transform .9s var(--ease)}
+.lc-att-img.is-loading img{opacity:0}
+.lc-att-img.is-loading::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#ffffff80 50%,transparent 70%) 0 0/200% 100%;animation:lc-shimmer 1.3s linear infinite}
+.lc-att-img:hover img{transform:scale(1.03)}
+.lc-att-img.is-broken{min-height:0;padding:14px;font-size:13px;color:var(--muted)}
+@keyframes lc-shimmer{to{background-position:-200% 0}}
+.lc-att-file,.lc-uploading{display:flex;align-items:center;gap:12px;width:min(300px,66vw);padding:12px 14px 12px 12px;border:1px solid var(--ink);transition:background .4s var(--ease)}
+.from-visitor .lc-att-file,.from-visitor .lc-uploading{background:var(--ink);color:var(--paper)}
+.from-agent .lc-att-file,.from-agent .lc-uploading{background:#fff}
+.lc-att-file:hover{background:var(--acid)!important;color:var(--ink)!important}
+.lc-att-icon{position:relative;width:38px;height:46px;flex-shrink:0;display:grid;place-items:center}
+.lc-att-icon svg{position:absolute;inset:0;width:100%;height:100%}
+.lc-att-icon b{position:relative;top:5px;font-size:8.5px;font-weight:850;letter-spacing:.04em;padding:1px 3px;background:var(--acid);color:var(--ink)}
+.lc-att-meta{display:grid;gap:3px;min-width:0;flex:1}
+.lc-att-meta strong{font-size:13.5px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-att-meta small{font-size:11px;opacity:.7}
+.lc-progress{display:block;height:3px;background:#ffffff30;margin-top:4px;overflow:hidden}
+.from-agent .lc-progress{background:#18191718}
+.lc-progress i{display:block;height:100%;background:var(--acid);transform:scaleX(.03);transform-origin:left;transition:transform .25s linear}
+.from-agent .lc-progress i{background:var(--ink)}
+.lc-row.is-failed .lc-att-file,.lc-row.is-failed .lc-uploading{background:#7a2e1f;color:var(--paper)}
+@media(max-width:650px){.lc-attach{width:46px}.lc-att-img{width:min(260px,68vw)}}
 .lc-foot{display:flex;justify-content:space-between;gap:12px;padding:9px 16px 10px;font-size:10.5px;line-height:1.5;color:var(--muted);background:#fff;border-top:1px solid #18191714;flex-shrink:0}
 .lc-foot kbd{font:inherit;font-weight:700}
 

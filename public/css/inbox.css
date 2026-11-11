@@ -15,6 +15,16 @@
 .ib-login-form input{height:52px;padding:12px 14px;border:1px solid #cdd1c7;background:#fff;font-size:16px;border-radius:0}
 .ib-login-form input:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px var(--acid)}
 .ib-login-form .hx-btn{justify-content:space-between;margin-top:6px}
+.ib-login-form [hidden]{display:none!important}
+.ib-password{display:grid;gap:16px}
+.ib-google-wrap{display:grid;gap:10px}
+.ib-google{display:flex;align-items:center;justify-content:center;gap:12px;height:54px;padding:0 18px;background:#fff;border:1px solid var(--ink);font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink);transition:background .4s var(--ease),transform .5s var(--spring),box-shadow .4s var(--ease)}
+.ib-google svg{width:20px;height:20px}
+.ib-google:hover:not(:disabled){background:var(--acid);transform:translateY(-2px);box-shadow:0 10px 24px -14px #18191780}
+.ib-google:disabled{opacity:.6;cursor:progress}
+.ib-hint{font-size:11.5px;line-height:1.5;color:var(--muted)}
+.ib-or{display:flex;align-items:center;gap:12px;margin-top:4px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ib-or::before,.ib-or::after{content:'';flex:1;height:1px;background:var(--line)}
 .ib-error{font-size:13px;color:#7a2e1f;min-height:1.2em}
 
 /* ---------- App frame ---------- */
@@ -114,3 +124,12 @@
   .ib-messages .lc-row{max-width:90%}
   .ib-search{font-size:16px;height:44px}          /* no iPhone auto-zoom */
 }
+
+/* Attachments: inbox flips bubble colors (team = dark) */
+.ib-messages .from-agent .lc-att-file,.ib-messages .from-agent .lc-uploading{background:var(--ink);color:var(--paper)}
+.ib-messages .from-visitor .lc-att-file,.ib-messages .from-visitor .lc-uploading{background:#fff;color:var(--ink)}
+.ib-messages .from-agent .lc-progress{background:#ffffff30}
+.ib-messages .from-agent .lc-progress i{background:var(--acid)}
+.ib-messages .from-visitor .lc-progress{background:#18191718}
+.ib-messages .from-visitor .lc-progress i{background:var(--ink)}
+.ib-messages .lc-row.is-failed .lc-bubble{background:#7a2e1f;color:var(--paper)}

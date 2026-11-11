@@ -1,10 +1,14 @@
 # Render Blueprint: Dashboard → New → Blueprint → pick this repo.
-# A persistent disk keeps chat history across deploys (needs the Starter plan or above).
+#
+# FREE plan: no card needed, and Render never bills a workspace that has no card on file.
+# Trade-offs of free: the server sleeps after 15 minutes without visitors (the next visitor waits ~1 minute),
+# and the disk is wiped whenever it sleeps or redeploys. That is why chat history is backed up to Cloudflare R2
+# (see the R2_* settings and DEPLOY.md, step 2). Until R2 is set up, history resets each time the server sleeps.
 services:
   - type: web
     name: plumb-contact
     runtime: node
-    plan: starter
+    plan: free
     region: singapore
     buildCommand: npm ci --omit=dev
     startCommand: npm start
@@ -17,17 +21,31 @@ services:
         value: production    # strict security mode: refuses weak passwords, blocks framing and foreign origins
       - key: CLIENT_IP_HEADER
         value: true-client-ip  # Render's edge sets this to the real visitor IP and rejects forged values
-      - key: DB_FILE
-        value: /var/data/chat.db
       - key: SESSION_SECRET
         generateValue: true
-      - key: INBOX_PASSWORD
-        sync: false          # Render asks for this when you create the Blueprint (12+ characters)
       - key: PUBLIC_URL
         sync: false          # e.g. https://yourdomain.com
+      - key: INBOX_PASSWORD
+        sync: false          # team password (12+ chars). Not needed once Google sign-in is on.
       - key: NOTIFY_WEBHOOK_URL
         sync: false          # optional Slack/Discord webhook
-    disk:
-      name: chat-data
-      mountPath: /var/data
-      sizeGB: 1
+      # --- Step 1: Google sign-in for the team (Firebase, free Spark plan) ---
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      - key: TEAM_EMAILS
+        sync: false          # who may sign in, e.g. "you@gmail.com, sara@gmail.com" or "@yourcompany.com"
+      # --- Step 2: Cloudflare R2 (chat files + database backups; free tier) ---
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false

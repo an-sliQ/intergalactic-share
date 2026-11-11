@@ -22,20 +22,25 @@ What protects the site, the chat and the team inbox. Each item was tested agains
 | **Information leaks** | No stack traces in responses, no `X-Powered-By`, dotfiles and paths outside `public/` are not served, and `/inbox` is `noindex` and `no-store`. |
 | **Slow-loris and oversized requests** | Header and request timeouts, a header count cap, and a body size cap (also in the Caddy config). |
 | **Other headers** | `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP, and HSTS over HTTPS in production. |
+| **Fake Google sign-ins** | The Google ID token is verified on the server against Google's public keys: RS256 only, correct issuer and audience (your Firebase project), at most 1 hour old, verified email. Then the email must be on `TEAM_EMAILS`, which is re-checked on every connection, so removing someone signs them out immediately. No Firebase service-account secret exists to leak. The Firebase SDK is self-hosted, not loaded from a CDN. |
+| **Malicious uploads** (HTML/SVG with scripts, programs renamed `.pdf`, zip bombs) | The file type comes from the file's own bytes, not its name or the browser's claim. Only an allow-list is accepted (images, PDF, Office, text, MP4/MOV), and SVG, HTML, archives and executables are refused. File names are cleaned (no paths, control characters or bidi tricks). Non-images are served as downloads. Files live on R2's domain, never on this site's origin, so they can't run scripts here. |
+| **Reading other people's files** | The bucket is private. Objects have random names. A 30-minute signed link is issued only to the conversation's own visitor or the team. |
+| **Upload abuse / surprise bills** | Who you are is checked *before* the body is read. Limits: 10 MB per file, per-IP and per-conversation limits, a site-wide daily limit, and monthly read/write/storage caps far below R2's free tier. These counters are saved in the backups, so restarts don't reset them. |
+| **Backups overwriting good data** | If R2 can't be reached at start-up, backups are disabled for that run, so an empty database never replaces your real history. Daily copies are kept for 14 days. The R2 key can only access its one bucket. |
 | **Server compromise blast radius (VPS)** | The systemd unit runs as an unprivileged user with a read-only filesystem except `.data`, with no privilege escalation and private /tmp. The Docker image runs as non-root. |
 
 ## Your part
 
 1. **Set `NODE_ENV=production`** when live (the Render blueprint and Dockerfile already do).
-2. Use a **long, unique `INBOX_PASSWORD`** and share it only with the team. Rotate it when someone leaves, which signs everyone out.
+2. Prefer **Google sign-in** ([SETUP.md](SETUP.md), step 1) and keep `TEAM_EMAILS` current. If you use the password instead, make it **long and unique**, share it only with the team, and rotate it when someone leaves (that signs everyone out).
 3. Set a fixed **`SESSION_SECRET`** (`openssl rand -hex 32`; Render generates one).
 4. Make sure the **real visitor IP** is detected for your host: Render uses `CLIENT_IP_HEADER=true-client-ip` (already set), behind Cloudflare's orange cloud use `cf-connecting-ip`, and a VPS behind Caddy uses `TRUST_PROXY=1` (already set).
 5. Keep dependencies patched: run `npm audit` and `npm update` now and then (currently 0 known vulnerabilities).
-6. **Back up** `.data/chat.db`. It contains visitor names, emails and messages, so treat backups as private.
+6. **Back up** the chats: R2 does it automatically ([SETUP.md](SETUP.md), step 2). The database contains visitor names, emails and messages, so keep the bucket private and the R2 key secret.
 7. On a VPS, for bigger traffic: put Cloudflare in front (orange cloud) for DDoS protection and set `CLIENT_IP_HEADER=cf-connecting-ip`, and firewall ports 80/443 to Cloudflare's IP ranges so nobody can bypass it. Render already sits behind Cloudflare.
 
 ## Known limits
 
-- A single shared team password rather than individual accounts. Fine for a small team; per-person accounts can be added later.
+- Without Google sign-in, the inbox uses one shared team password. With it, each person signs in with their own Google account.
 - Inbox sessions live in the browser's `localStorage`. The CSP makes script injection very hard, but sign out on shared computers.
 - Rate limits are in memory per server, which is right for this single-server setup.

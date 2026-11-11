@@ -34,6 +34,24 @@ export function openDb(file) {
       created_at      INTEGER NOT NULL,
       read_at         INTEGER
     );
+    CREATE TABLE IF NOT EXISTS attachments (
+      id              TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      message_id      INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      object_key      TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      mime            TEXT NOT NULL,
+      kind            TEXT NOT NULL CHECK (kind IN ('image','file')),
+      size            INTEGER NOT NULL,
+      uploader        TEXT NOT NULL CHECK (uploader IN ('visitor','agent')),
+      created_at      INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_att_conv ON attachments(conversation_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_att_msg ON attachments(message_id);
+    CREATE TABLE IF NOT EXISTS kv (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, id);
     CREATE INDEX IF NOT EXISTS idx_conv_last ON conversations(last_message_at DESC);
   `);
@@ -52,13 +70,25 @@ export function openDb(file) {
     touch: db.prepare(`UPDATE conversations SET last_message_at = ?, updated_at = ?, status = 'open' WHERE id = ?`),
     insertMsg: db.prepare(`INSERT INTO messages (conversation_id, sender, agent_name, body, created_at)
       VALUES (?, ?, ?, ?, ?)`),
-    getMsg: db.prepare(`SELECT * FROM messages WHERE id = ?`),
-    listMsgs: db.prepare(`SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 500) ORDER BY id ASC`),
+    getMsg: db.prepare(`SELECT m.*, a.id AS att_id, a.name AS att_name, a.mime AS att_mime, a.kind AS att_kind, a.size AS att_size
+      FROM messages m LEFT JOIN attachments a ON a.message_id = m.id WHERE m.id = ?`),
+    listMsgs: db.prepare(`SELECT * FROM (
+        SELECT m.*, a.id AS att_id, a.name AS att_name, a.mime AS att_mime, a.kind AS att_kind, a.size AS att_size
+        FROM messages m LEFT JOIN attachments a ON a.message_id = m.id
+        WHERE m.conversation_id = ? ORDER BY m.id DESC LIMIT 500) ORDER BY id ASC`),
+    insertAtt: db.prepare(`INSERT INTO attachments (id, conversation_id, message_id, object_key, name, mime, kind, size, uploader, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+    getAtt: db.prepare(`SELECT * FROM attachments WHERE id = ?`),
+    attBytes: db.prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM attachments`),
+    attCountSince: db.prepare(`SELECT COUNT(*) AS n FROM attachments WHERE conversation_id = ? AND created_at > ?`),
+    kvGet: db.prepare(`SELECT v FROM kv WHERE k = ?`),
+    kvSet: db.prepare(`INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`),
+    totalChanges: db.prepare(`SELECT total_changes() AS n`),
     markRead: db.prepare(`UPDATE messages SET read_at = ? WHERE conversation_id = ? AND sender = ? AND read_at IS NULL`),
     countVisitorMsgs: db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND sender = 'visitor'`),
     listConvs: db.prepare(`
       SELECT c.*,
-        (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_body,
+        (SELECT CASE WHEN m.body = '' THEN 'File: ' || COALESCE((SELECT a.name FROM attachments a WHERE a.message_id = m.id), 'File') ELSE m.body END FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_body,
         (SELECT sender FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_sender,
         (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender = 'visitor' AND m.read_at IS NULL) AS unread
       FROM conversations c
@@ -67,7 +97,7 @@ export function openDb(file) {
       LIMIT 300`),
     convSummary: db.prepare(`
       SELECT c.*,
-        (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_body,
+        (SELECT CASE WHEN m.body = '' THEN 'File: ' || COALESCE((SELECT a.name FROM attachments a WHERE a.message_id = m.id), 'File') ELSE m.body END FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_body,
         (SELECT sender FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_sender,
         (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender = 'visitor' AND m.read_at IS NULL) AS unread
       FROM conversations c WHERE c.id = ?`),
@@ -75,6 +105,28 @@ export function openDb(file) {
 
   return {
     close: () => db.close(),
+    // A consistent copy of the whole database (safe while the app is running), for backups.
+    snapshot(toPath) { db.exec(`VACUUM INTO '${String(toPath).replace(/'/g, "''")}'`); },
+    // Increases on every write; backups compare it to skip uploads when nothing changed.
+    changeCounter: () => Number(q.totalChanges.get().n),
+    kvGet: (k) => { const r = q.kvGet.get(k); return r ? r.v : null; },
+    kvSet: (k, v) => q.kvSet.run(k, String(v)),
+    // Message + attachment written together: either both exist or neither does.
+    addAttachmentMessage({ conversationId, sender, agentName, attachment }) {
+      const now = Date.now();
+      db.exec('BEGIN');
+      try {
+        const { lastInsertRowid } = q.insertMsg.run(conversationId, sender, agentName ?? null, '', now);
+        const a = attachment;
+        q.insertAtt.run(a.id, conversationId, Number(lastInsertRowid), a.key, a.name, a.mime, a.kind, a.size, sender, now);
+        q.touch.run(now, now, conversationId);
+        db.exec('COMMIT');
+        return q.getMsg.get(Number(lastInsertRowid));
+      } catch (e) { db.exec('ROLLBACK'); throw e; }
+    },
+    getAttachment: (id) => q.getAtt.get(id),
+    attachmentBytes: () => Number(q.attBytes.get().n),
+    attachmentCountSince: (conversationId, since) => Number(q.attCountSince.get(conversationId, since).n),
     createConversation({ id, tokenHash, page, referrer, userAgent, timezone }) {
       const now = Date.now();
       q.insertConv.run(id, tokenHash, page ?? null, referrer ?? null, userAgent ?? null, timezone ?? null, now, now);

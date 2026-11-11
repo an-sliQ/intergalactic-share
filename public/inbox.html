@@ -22,9 +22,19 @@
       <h1>INBOX<span class="mo-dot">.</span><em>Answer visitors in real time.</em></h1>
     </div>
     <form class="ib-login-form" data-login novalidate>
-      <label>Your name, as visitors will see it<input name="name" autocomplete="name" placeholder="e.g. Noah" required maxlength="40"></label>
-      <label>Team password<input name="password" type="password" autocomplete="current-password" required></label>
-      <button class="hx-btn" type="submit">Sign in <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+      <label>Your name, as visitors will see it<input name="name" autocomplete="given-name" placeholder="e.g. Noah" maxlength="40"></label>
+      <div class="ib-google-wrap" data-google hidden>
+        <button class="ib-google" type="button" data-google-btn>
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+          <span>Continue with Google</span>
+        </button>
+        <p class="ib-hint">Only team emails on the allow-list can get in. Your name defaults to your Google first name.</p>
+        <div class="ib-or" data-or><span>or use the team password</span></div>
+      </div>
+      <div class="ib-password" data-password>
+        <label>Team password<input name="password" type="password" autocomplete="current-password"></label>
+        <button class="hx-btn" type="submit">Sign in <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+      </div>
       <p class="ib-error" role="alert" data-login-error></p>
     </form>
   </div>
@@ -76,6 +86,8 @@
         <div class="ib-messages" data-messages role="log" aria-live="polite"></div>
         <div class="ib-quick" data-quick></div>
         <form class="lc-compose ib-compose" data-compose>
+          <button class="lc-attach" type="button" data-attach aria-label="Attach a file" title="Attach a file" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg></button>
+          <input type="file" class="sr-only" data-file tabindex="-1" aria-hidden="true" multiple>
           <label class="sr-only" for="ib-input">Reply</label>
           <textarea id="ib-input" rows="1" placeholder="Reply… (Enter to send, Shift+Enter for a new line)" maxlength="4000"></textarea>
           <button class="lc-send" type="submit" aria-label="Send" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>

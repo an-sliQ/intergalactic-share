@@ -1,4 +1,5 @@
 // Team inbox: sign in, see conversations live, reply in real time.
+import { prepareFile, uploadFile, makeUrlCache, attachmentNode, uploadingNode, wireFileInputs } from './attachments.js';
 const AUTH_KEY = 'plumb.inbox.v1';
 const QUICK_REPLIES = [
   'Thanks for reaching out! Could you share your current website, if you have one?',
@@ -67,16 +68,65 @@ const state = {
   typing: new Map(), // conversationId -> bool
   presence: { agents: [] },
   notify: localStorage.getItem('plumb.inbox.notify') === '1',
+  features: { files: false, fileMaxMb: 10, accept: '' },
 };
 
 // ---------------------------------------------------------------- views
 function show(view) { $$('[data-view]').forEach((v) => { v.hidden = v.dataset.view !== view; }); }
 
+// Which sign-in methods are on (Google via Firebase, the team password, or both).
+let loginConfig = { googleSignIn: null, passwordLogin: true };
+const loginReady = fetch('/api/config').then((r) => r.json()).then((c) => {
+  loginConfig = c;
+  $('[data-google]').hidden = !c.googleSignIn;
+  $('[data-or]').hidden = !c.passwordLogin;
+  $('[data-password]').hidden = !c.passwordLogin;
+}).catch(() => {});
+
+let firebaseAuth = null;
+async function getFirebaseAuth() {
+  if (firebaseAuth) return firebaseAuth;
+  const fb = await import('/vendor/firebase-auth.js');
+  const app = fb.initializeApp(loginConfig.googleSignIn);
+  const auth = fb.getAuth(app);
+  await fb.setPersistence(auth, fb.browserSessionPersistence);
+  firebaseAuth = { fb, auth };
+  return firebaseAuth;
+}
+$('[data-google-btn]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget; const err = $('[data-login-error]');
+  err.textContent = ''; btn.disabled = true;
+  try {
+    await loginReady;
+    const { fb, auth } = await getFirebaseAuth();
+    const provider = new fb.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await fb.signInWithPopup(auth, provider);
+    const idToken = await cred.user.getIdToken();
+    fb.signOut(auth).catch(() => {}); // we only need Google to prove who you are once
+    const res = await fetch('/api/login/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, name: $('[data-login]').name.value.trim() }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not sign in.');
+    state.auth = data; localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+    start();
+  } catch (ex) {
+    const code = ex?.code || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') err.textContent = '';
+    else if (code === 'auth/popup-blocked') err.textContent = 'Your browser blocked the Google window. Allow pop-ups for this site and try again.';
+    else if (code === 'auth/unauthorized-domain') err.textContent = 'This domain is not on the Firebase "Authorized domains" list yet.';
+    else if (code === 'auth/network-request-failed') err.textContent = 'Network problem. Check your connection and try again.';
+    else err.textContent = ex.message?.replace(/^Firebase: /, '') || 'Could not sign in.';
+  } finally { btn.disabled = false; }
+});
+
 $('[data-login]').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.currentTarget; const err = $('[data-login-error]');
   err.textContent = '';
-  const btn = f.querySelector('button'); btn.disabled = true;
+  if (!loginConfig.passwordLogin) return;
+  if (!f.name.value.trim()) { err.textContent = 'Enter your name.'; f.name.focus(); return; }
+  if (!f.password.value) { err.textContent = 'Enter the team password.'; f.password.focus(); return; }
+  const btn = f.querySelector('[type=submit]'); btn.disabled = true;
   try {
     const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name.value.trim(), password: f.password.value }) });
     const data = await res.json();
@@ -176,8 +226,64 @@ function messageRow(m, prev) {
   const grouped = prev && prev.sender === m.sender && prev.agentName === m.agentName && (m.createdAt - prev.createdAt) < 3 * 60 * 1000;
   const row = el('div', { class: `lc-row from-${m.sender}${grouped ? ' is-grouped' : ''}`, 'data-id': m.id });
   if (!grouped) row.append(el('div', { class: 'lc-meta' }, el('b', { text: m.sender === 'agent' ? (m.agentName === state.auth.name ? 'You' : m.agentName) : displayName(state.convs.get(m.conversationId) || { id: m.conversationId }) }), ` · ${timeFmt.format(m.createdAt).toLowerCase()}`));
-  row.append(el('div', { class: 'lc-bubble' }, richText(m.body)));
+  if (m.uploading) {
+    m.uploadNode ||= uploadingNode(m.fileName);
+    row.append(el('div', { class: 'lc-bubble lc-bubble-att' }, m.uploadNode));
+  } else if (m.attachment) {
+    row.append(el('div', { class: `lc-bubble lc-bubble-att${m.attachment.kind === 'image' ? ' is-image' : ''}` }, attachmentNode(m.attachment, getFileUrl)));
+  } else row.append(el('div', { class: 'lc-bubble' }, richText(m.body)));
+  if (m.failed) row.classList.add('is-failed');
   return row;
+}
+
+// ---------------------------------------------------------------- files
+const getFileUrl = makeUrlCache((id) => new Promise((resolve) => {
+  if (!state.socket?.connected) return resolve({ error: 'Offline' });
+  state.socket.timeout(8000).emit('file:url', { id }, (err, res) => resolve(err ? { error: 'Timed out' } : res));
+}));
+const attachBtn = $('[data-attach]');
+const fileInput = $('[data-file]');
+function applyFeatures(f) {
+  if (!f) return;
+  state.features = f;
+  attachBtn.hidden = !f.files;
+  fileInput.setAttribute('accept', f.accept || '');
+  $('[data-compose]').classList.toggle('has-attach', !!f.files);
+}
+attachBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { const f = [...fileInput.files]; fileInput.value = ''; sendFiles(f); });
+
+async function sendFiles(files) {
+  if (!state.features.files || !state.activeId || !files.length) return;
+  const cid = state.activeId;
+  for (const raw of files.slice(0, 5)) {
+    let file;
+    try { file = await prepareFile(raw, state.features.fileMaxMb); } catch (e) { alert(e.message); continue; }
+    const m = { id: `up-${Math.random().toString(36).slice(2)}`, conversationId: cid, sender: 'agent', agentName: state.auth.name, body: '', createdAt: Date.now(), uploading: true, fileName: file.name || 'file' };
+    if (state.activeId === cid) { state.messages.push(m); appendToThread(m); }
+    try {
+      const msg = await uploadFile({
+        file,
+        headers: { Authorization: `Bearer ${state.auth.token}`, 'X-Conversation-Id': cid, 'X-Socket-Id': state.socket?.id },
+        onProgress: (p) => m.uploadNode?.setProgress(p),
+      });
+      swapMessage(m, msg);
+    } catch (e) {
+      Object.assign(m, { uploading: false, failed: true, body: `Could not send ${m.fileName}: ${e.message}` });
+      swapMessage(m, m);
+    }
+  }
+  if (files.length > 5) alert('You can send up to 5 files at a time.');
+}
+function swapMessage(oldM, newM) {
+  const i = state.messages.indexOf(oldM);
+  const row = msgBox.querySelector(`.lc-row[data-id="${oldM.id}"]`);
+  if (i < 0) return;
+  if (newM !== oldM && state.messages.some((x) => x.id === newM.id)) { state.messages.splice(i, 1); row?.remove(); return; }
+  state.messages[i] = newM;
+  const prev = state.messages[i - 1];
+  if (row) row.replaceWith(messageRow(newM, prev && prev.sender !== 'system' ? prev : null));
+  renderSeen();
 }
 
 function renderThread() {
@@ -221,7 +327,7 @@ function renderDetails() {
   const c = state.convs.get(state.activeId);
   if (!c || box.hidden) return;
   const row = (k, v) => [el('dt', { text: k }), el('dd', {}, v || el('span', { class: 'ib-muted', text: 'Not given' }))];
-  box.replaceChildren(
+  box.replaceChildren(...[
     el('h3', { text: displayName(c) }),
     el('dl', {},
       row('Email', c.email ? el('a', { href: `mailto:${c.email}`, text: c.email }) : null),
@@ -233,7 +339,7 @@ function renderDetails() {
       row('First message', c.createdAt ? fullFmt.format(c.createdAt) : null),
       row('Status', c.online ? 'On the page now' : 'Not on the page')),
     c.email ? el('a', { class: 'hx-btn', href: `mailto:${c.email}?subject=${encodeURIComponent('Following up on your chat with Plumb')}` }, 'Email a follow-up', el('span', { text: '→' })) : null,
-    el('button', { class: 'ib-ghost', type: 'button', style: 'margin-top:10px;width:100%', text: 'Hide details', onclick: () => { box.hidden = true; } }));
+    el('button', { class: 'ib-ghost', type: 'button', style: 'margin-top:10px;width:100%', text: 'Hide details', onclick: () => { box.hidden = true; } })].filter(Boolean));
 }
 $('[data-t-details]').addEventListener('click', () => { const box = $('[data-details]'); box.hidden = !box.hidden; renderDetails(); });
 
@@ -263,6 +369,7 @@ function sendReply() {
     if (state.activeId === cid && !state.messages.some((m) => m.id === res.message.id)) { state.messages.push(res.message); appendToThread(res.message); }
   });
 }
+wireFileInputs({ dropZone: $('[data-thread]'), pasteTarget: input, onFiles: sendFiles, enabled: () => state.features.files && !!state.activeId });
 $('[data-quick]').append(...QUICK_REPLIES.map((t) => el('button', { type: 'button', text: t.length > 46 ? t.slice(0, 44) + '…' : t, title: t, onclick: () => { input.value = t; autosize(); sendBtn.disabled = false; input.focus(); } })));
 
 // ---------------------------------------------------------------- alerts
@@ -281,7 +388,7 @@ function alertNew(m) {
   if (viewing) return;
   chime();
   if (state.notify && 'Notification' in window && Notification.permission === 'granted') {
-    const n = new Notification(c ? displayName(c) : 'New message', { body: m.body.slice(0, 140), tag: m.conversationId, icon: '/favicon.svg' });
+    const n = new Notification(c ? displayName(c) : 'New message', { body: m.attachment ? `Sent a file: ${m.attachment.name}` : m.body.slice(0, 140), tag: m.conversationId, icon: '/favicon.svg' });
     n.onclick = () => { window.focus(); openConversation(m.conversationId); n.close(); };
   }
 }
@@ -299,6 +406,7 @@ function start() {
   });
   socket.on('session:expired', () => { localStorage.removeItem(AUTH_KEY); state.auth = null; socket.disconnect(); show('login'); $('[data-login-error]').textContent = 'Your session expired. Sign in again.'; });
   socket.on('ready', (r) => {
+    applyFeatures(r.features);
     state.convs = new Map(r.conversations.map((c) => [c.id, c]));
     renderList();
     const fromHash = location.hash.slice(1);
@@ -320,7 +428,7 @@ function start() {
   });
   socket.on('message', (m) => {
     const c = state.convs.get(m.conversationId);
-    if (c) { c.lastBody = m.body; c.lastSender = m.sender; c.lastMessageAt = m.createdAt; }
+    if (c) { c.lastBody = m.attachment ? `File: ${m.attachment.name}` : m.body; c.lastSender = m.sender; c.lastMessageAt = m.createdAt; }
     if (m.conversationId === state.activeId && !state.messages.some((x) => x.id === m.id)) {
       state.messages.push(m); appendToThread(m);
       if (m.sender === 'visitor' && document.visibilityState === 'visible') socket.emit('read', { conversationId: m.conversationId });

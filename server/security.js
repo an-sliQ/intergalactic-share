@@ -124,31 +124,43 @@ function inlineScriptHashes(publicDir) {
   return [...hashes];
 }
 
-export function securityHeaders({ publicDir, production }) {
+export function securityHeaders({ publicDir, production, extra = () => null }) {
   const scriptHashes = inlineScriptHashes(publicDir).join(' ');
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' ${scriptHashes}`.trim(),
-    "style-src 'self' 'unsafe-inline'",   // style="" attributes only drive CSS variables for animation delays
-    "img-src 'self' data:",
-    "font-src 'self'",
-    "connect-src 'self'",                 // includes same-origin ws:/wss: for the live chat
-    "media-src 'none'",
-    "object-src 'none'",
-    "worker-src 'none'",
-    "base-uri 'none'",
-    "form-action 'self'",
-    "manifest-src 'self'",
-    production ? "frame-ancestors 'none'" : '',
-    production ? 'upgrade-insecure-requests' : '',
-  ].filter(Boolean).join('; ');
+  const cache = new Map();
+  // extra(req) can add sources per page, e.g. the R2 file host for images, or Google sign-in on /inbox.
+  function buildCsp(x = {}) {
+    const key = JSON.stringify(x);
+    if (cache.has(key)) return cache.get(key);
+    const j = (a) => (a && a.length ? ' ' + [...new Set(a)].join(' ') : '');
+    const csp = [
+      "default-src 'self'",
+      `script-src 'self' ${scriptHashes}${j(x.script)}`.replace(/\s+/g, ' ').trim(),
+      "style-src 'self' 'unsafe-inline'",   // style="" attributes only drive CSS variables for animation delays
+      `img-src 'self' data: blob:${j(x.img)}`,
+      "font-src 'self'",
+      `connect-src 'self'${j(x.connect)}`,  // 'self' includes same-origin ws:/wss: for the live chat
+      x.frame?.length ? `frame-src${j(x.frame)}` : "frame-src 'none'",
+      "media-src 'none'",
+      "object-src 'none'",
+      "worker-src 'none'",
+      "base-uri 'none'",
+      "form-action 'self'",
+      "manifest-src 'self'",
+      production ? "frame-ancestors 'none'" : '',
+      production ? 'upgrade-insecure-requests' : '',
+    ].filter(Boolean).join('; ');
+    cache.set(key, csp);
+    return csp;
+  }
 
   return (req, res, next) => {
-    res.setHeader('Content-Security-Policy', csp);
+    const x = extra(req) || {};
+    res.setHeader('Content-Security-Policy', buildCsp(x));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()');
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    // Google's sign-in popup must be able to report back to the inbox window.
+    res.setHeader('Cross-Origin-Opener-Policy', x.popups ? 'same-origin-allow-popups' : 'same-origin');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.setHeader('X-DNS-Prefetch-Control', 'off');
     res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
