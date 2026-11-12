@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Inbox | Cairnly</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#181a17">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/inbox.css">
+</head>
+<body class="ib-body">
+
+<!-- Sign in -->
+<section class="ib-login" data-view="login" hidden>
+  <div class="ib-login-inner">
+    <a class="wordmark" href="/">Cairnly<span>.</span></a>
+    <div>
+      <p class="eyebrow">Team only</p>
+      <h1>INBOX<span class="mo-dot">.</span><em>Answer visitors in real time.</em></h1>
+    </div>
+    <form class="ib-login-form" data-login novalidate>
+      <label>Your name, as visitors will see it<input name="name" autocomplete="given-name" placeholder="e.g. Noah" maxlength="40"></label>
+      <div class="ib-google-wrap" data-google hidden>
+        <button class="ib-google" type="button" data-google-btn>
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+          <span>Continue with Google</span>
+        </button>
+        <p class="ib-hint">Only team emails on the allow-list can get in. Your name defaults to your Google first name.</p>
+        <div class="ib-or" data-or><span>or use the team password</span></div>
+      </div>
+      <div class="ib-password" data-password>
+        <label>Team password<input name="password" type="password" autocomplete="current-password"></label>
+        <button class="hx-btn" type="submit">Sign in <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+      </div>
+      <p class="ib-error" role="alert" data-login-error></p>
+    </form>
+  </div>
+</section>
+
+<!-- App -->
+<div class="ib-app" data-view="app" hidden>
+  <header class="ib-top">
+    <a class="wordmark" href="/" target="_blank" rel="noopener">Cairnly<span>.</span></a>
+    <span class="ib-top-label">Inbox</span>
+    <span class="ib-me" data-me></span>
+    <div class="ib-top-actions">
+      <button class="ib-ghost" type="button" data-notify>Turn on alerts</button>
+      <button class="ib-ghost" type="button" data-signout>Sign out</button>
+    </div>
+  </header>
+
+  <div class="ib-cols" data-cols>
+    <aside class="ib-list-col" aria-label="Conversations">
+      <div class="ib-list-tools">
+        <div class="ib-tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-filter="open">Open <span data-count="open"></span></button>
+          <button role="tab" aria-selected="false" data-filter="closed">Closed</button>
+          <button role="tab" aria-selected="false" data-filter="all">All</button>
+        </div>
+        <input class="ib-search" type="search" placeholder="Search name, email or message" data-search aria-label="Search conversations">
+      </div>
+      <ul class="ib-list" data-list></ul>
+      <div class="ib-list-empty" data-list-empty hidden>
+        <strong>No conversations yet.</strong>
+        <p>Open the <a href="/" target="_blank" rel="noopener">contact page</a> in another tab and send a message. It will appear here instantly.</p>
+      </div>
+    </aside>
+
+    <main class="ib-thread-col" data-thread-col>
+      <div class="ib-empty" data-empty>
+        <p class="eyebrow">Inbox</p>
+        <h2>PICK A <em>conversation.</em></h2>
+        <p>New chats appear on the left the moment a visitor writes. Visitors see that you're online while this tab is open.</p>
+      </div>
+      <section class="ib-thread" data-thread hidden>
+        <header class="ib-thread-head">
+          <button class="ib-back" type="button" data-back aria-label="Back to conversations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button>
+          <span class="ib-avatar" data-t-avatar></span>
+          <div class="ib-thread-title"><strong data-t-name></strong><span data-t-sub></span></div>
+          <button class="ib-ghost" type="button" data-t-details>Details</button>
+          <button class="ib-ghost" type="button" data-t-status>Close</button>
+        </header>
+        <div class="ib-messages" data-messages role="log" aria-live="polite"></div>
+        <div class="ib-quick" data-quick></div>
+        <form class="lc-compose ib-compose" data-compose>
+          <button class="lc-attach" type="button" data-attach aria-label="Attach a file" title="Attach a file" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg></button>
+          <input type="file" class="sr-only" data-file tabindex="-1" aria-hidden="true" multiple>
+          <label class="sr-only" for="ib-input">Reply</label>
+          <textarea id="ib-input" rows="1" placeholder="Reply… (Enter to send, Shift+Enter for a new line)" maxlength="4000"></textarea>
+          <button class="lc-send" type="submit" aria-label="Send" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
+        </form>
+      </section>
+    </main>
+
+    <aside class="ib-details" data-details hidden aria-label="Visitor details"></aside>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.min.js" defer></script>
+<script src="/js/inbox.js" type="module"></script>
+</body>
+</html>

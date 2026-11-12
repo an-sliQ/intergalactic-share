@@ -1,0 +1,44 @@
+# Render settings for this app. GO-LIVE.md creates the service by hand (New → Web Service → Free) with these same
+# values. This file also works as a Blueprint (New → Blueprint).
+#
+# FREE plan: no card needed, and Render never bills a workspace that has no card on file.
+# Trade-offs of free: the server sleeps after 15 minutes without visitors (the next visitor waits ~1 minute),
+# and the disk is wiped whenever it sleeps or redeploys. That is why chat history is backed up to Supabase Storage
+# (free, no card; see GO-LIVE.md steps 2–3). Until Supabase is set up, history resets each time the server sleeps.
+services:
+  - type: web
+    name: cairnly-contact
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production    # strict security mode: refuses weak passwords, blocks framing and foreign origins
+      - key: CLIENT_IP_HEADER
+        value: true-client-ip  # Render's edge sets this to the real visitor IP and rejects forged values
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false          # e.g. https://yourdomain.com
+      - key: CONTACT_EMAIL
+        sync: false          # the email shown on the page; change it any time here
+      - key: INBOX_PASSWORD
+        sync: false          # team password (12+ chars). Not needed once Google sign-in is on.
+      - key: NOTIFY_WEBHOOK_URL
+        sync: false          # optional Slack/Discord webhook
+      # --- GO-LIVE.md step 2: Supabase (free, no card) for chat files + database backups ---
+      - key: SUPABASE_URL
+        sync: false          # https://<project>.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false          # sb_publishable_… (public; also enables Google sign-in)
+      - key: SUPABASE_SECRET_KEY
+        sync: false          # sb_secret_… (keep private: server only)
+      # --- GO-LIVE.md step 5: who may sign in with Google ---
+      - key: TEAM_EMAILS
+        sync: false          # e.g. "you@gmail.com, sara@gmail.com" or "@yourcompany.com"
