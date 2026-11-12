@@ -32,11 +32,11 @@ What protects the site, the chat and the team inbox. Each item was tested agains
 ## Your part
 
 1. **Set `NODE_ENV=production`** when live (the Render blueprint and Dockerfile already do).
-2. Prefer **Google sign-in** ([SETUP.md](SETUP.md), step 2) and keep `TEAM_EMAILS` current. If you use the password instead, make it **long and unique**, share it only with the team, and rotate it when someone leaves (that signs everyone out).
+2. Prefer **Google sign-in** ([GO-LIVE.md](GO-LIVE.md), step 5) and keep `TEAM_EMAILS` current. If you use the password instead, make it **long and unique**, share it only with the team, and rotate it when someone leaves (that signs everyone out).
 3. Set a fixed **`SESSION_SECRET`** (`openssl rand -hex 32`; Render generates one).
 4. Make sure the **real visitor IP** is detected for your host: Render uses `CLIENT_IP_HEADER=true-client-ip` (already set), behind Cloudflare's orange cloud use `cf-connecting-ip`, and a VPS behind Caddy uses `TRUST_PROXY=1` (already set).
 5. Keep dependencies patched: run `npm audit` and `npm update` now and then (currently 0 known vulnerabilities).
-6. **Back up** the chats: Supabase does it automatically ([SETUP.md](SETUP.md), step 1). The database contains visitor names, emails and messages, so keep the bucket private and `SUPABASE_SECRET_KEY` secret.
+6. **Back up** the chats: Supabase does it automatically ([GO-LIVE.md](GO-LIVE.md), steps 2–3). The database contains visitor names, emails and messages, so keep the bucket private and `SUPABASE_SECRET_KEY` secret.
 7. On a VPS, for bigger traffic: put Cloudflare in front (orange cloud) for DDoS protection and set `CLIENT_IP_HEADER=cf-connecting-ip`, and firewall ports 80/443 to Cloudflare's IP ranges so nobody can bypass it. Render already sits behind Cloudflare.
 
 ## Known limits

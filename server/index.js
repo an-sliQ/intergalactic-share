@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { openDb } from './db.js';
 import {
@@ -35,6 +36,11 @@ const NOTIFY_WEBHOOK_URL = /^https:\/\//.test(env.NOTIFY_WEBHOOK_URL || '') ? en
 const TRUST_PROXY = Number.isFinite(Number(env.TRUST_PROXY)) && env.TRUST_PROXY !== '' ? Number(env.TRUST_PROXY) : 1;
 const CLIENT_IP_HEADER = env.CLIENT_IP_HEADER || '';
 const ALLOWED_ORIGINS = [PUBLIC_URL, ...(env.ALLOWED_ORIGINS || '').split(',')].map((s) => s.trim()).filter(Boolean);
+// Public contact email shown on the page. Change it any time in the host's environment settings (no code edits).
+const DEFAULT_CONTACT_EMAIL = 'hello@cairnly.studio'; // the placeholder written in public/index.html
+const CONTACT_EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/; // plain characters only: safe inside HTML, JSON and mailto links
+const CONTACT_EMAIL = CONTACT_EMAIL_RE.test((env.CONTACT_EMAIL || '').trim()) ? env.CONTACT_EMAIL.trim() : DEFAULT_CONTACT_EMAIL;
+if (env.CONTACT_EMAIL && CONTACT_EMAIL !== env.CONTACT_EMAIL.trim()) console.warn(`\n  ⚠  CONTACT_EMAIL "${env.CONTACT_EMAIL}" doesn't look like an email address. Showing ${DEFAULT_CONTACT_EMAIL} instead.\n`);
 const SESSION_DAYS = Math.min(Math.max(Number(env.SESSION_DAYS) || 14, 1), 90);
 
 // Optional services (each stays off until its settings are present).
@@ -326,6 +332,13 @@ const privatePage = (res) => {
 };
 app.get(['/inbox', '/inbox.html'], (_req, res) => { privatePage(res); res.sendFile(join(PUBLIC_DIR, 'inbox.html')); });
 app.use(['/js/inbox.js', '/css/inbox.css'], (_req, res, next) => { res.setHeader('X-Robots-Tag', 'noindex'); next(); });
+
+// The contact page, with the contact email filled in from CONTACT_EMAIL.
+const indexHtml = readFileSync(join(PUBLIC_DIR, 'index.html'), 'utf8').replaceAll(DEFAULT_CONTACT_EMAIL, CONTACT_EMAIL);
+app.get(['/', '/index.html', '/index'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(indexHtml);
+});
 
 app.use(express.static(PUBLIC_DIR, {
   extensions: ['html'],
@@ -672,6 +685,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 server.listen(PORT, HOST, () => {
   console.log(`\n  Contact page  → http://localhost:${PORT}/`);
   console.log(`  Team inbox    → http://localhost:${PORT}/inbox`);
+  console.log(`  Contact email → ${CONTACT_EMAIL}${CONTACT_EMAIL === DEFAULT_CONTACT_EMAIL ? '  (placeholder: set CONTACT_EMAIL)' : ''}`);
   console.log(`  Sign-in       → ${[supaAuth.enabled && 'Google (Supabase)', PASSWORD_LOGIN && 'team password'].filter(Boolean).join(' + ')}`);
   console.log(`  Files         → ${FILES_ENABLED ? `on, up to ${FILE_MAX_MB} MB, ${store.describe()}` : 'off (set SUPABASE_URL + SUPABASE_SECRET_KEY to turn on)'}`);
   console.log(`  Backups       → ${backups.enabled ? `to Supabase every ${BACKUP_INTERVAL_SEC}s when something changed, ${BACKUP_KEEP_DAYS} daily copies kept` : store.enabled ? 'OFF this run (Supabase was unreachable at start)' : 'off (set SUPABASE_URL + SUPABASE_SECRET_KEY to turn on)'}\n`);

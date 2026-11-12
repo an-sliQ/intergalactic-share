@@ -1,9 +1,10 @@
-# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# Render settings for this app. GO-LIVE.md creates the service by hand (New → Web Service → Free) with these same
+# values. This file also works as a Blueprint (New → Blueprint).
 #
 # FREE plan: no card needed, and Render never bills a workspace that has no card on file.
 # Trade-offs of free: the server sleeps after 15 minutes without visitors (the next visitor waits ~1 minute),
 # and the disk is wiped whenever it sleeps or redeploys. That is why chat history is backed up to Supabase Storage
-# (free, no card; see SETUP.md step 1). Until Supabase is set up, history resets each time the server sleeps.
+# (free, no card; see GO-LIVE.md steps 2–3). Until Supabase is set up, history resets each time the server sleeps.
 services:
   - type: web
     name: cairnly-contact
@@ -25,17 +26,19 @@ services:
         generateValue: true
       - key: PUBLIC_URL
         sync: false          # e.g. https://yourdomain.com
+      - key: CONTACT_EMAIL
+        sync: false          # the email shown on the page; change it any time here
       - key: INBOX_PASSWORD
         sync: false          # team password (12+ chars). Not needed once Google sign-in is on.
       - key: NOTIFY_WEBHOOK_URL
         sync: false          # optional Slack/Discord webhook
-      # --- SETUP.md step 1: Supabase (free, no card) for chat files + database backups ---
+      # --- GO-LIVE.md step 2: Supabase (free, no card) for chat files + database backups ---
       - key: SUPABASE_URL
         sync: false          # https://<project>.supabase.co
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false          # sb_publishable_… (public; also enables Google sign-in)
       - key: SUPABASE_SECRET_KEY
         sync: false          # sb_secret_… (keep private: server only)
-      # --- SETUP.md step 2: who may sign in with Google ---
+      # --- GO-LIVE.md step 5: who may sign in with Google ---
       - key: TEAM_EMAILS
         sync: false          # e.g. "you@gmail.com, sara@gmail.com" or "@yourcompany.com"
