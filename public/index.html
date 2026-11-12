@@ -13,7 +13,6 @@
   <link rel="preload" href="/fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/fraunces-latin-wght-italic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/site.css">
-  <link rel="stylesheet" href="/css/chat.css">
   <script>document.documentElement.classList.add('mo','gx');</script>
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"ProfessionalService","name":"Cairnly","description":"Websites and AI automation for businesses.","email":"hello@cairnly.studio","areaServed":"Worldwide"}
@@ -31,7 +30,7 @@
       <a href="#process">Process</a>
       <a href="#faq">Questions</a>
       <a href="mailto:hello@cairnly.studio">Email</a>
-      <a class="nav-contact" href="#chat" data-open-chat>Start a chat <span aria-hidden="true">→</span></a>
+      <a class="nav-contact" href="/chat">Start a chat <span aria-hidden="true">→</span></a>
     </nav>
   </div>
 </header>
@@ -59,7 +58,7 @@
         <p>Websites, and AI that handles the replies, quotes and paperwork your team repeats. Start a chat and talk to the people who will build it. No bot and no sales queue.</p>
         <div class="hx-hero-side">
           <div class="hx-actions">
-            <a class="hx-btn" href="#chat" data-open-chat>Start a chat
+            <a class="hx-btn" href="/chat">Start a chat
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
             </a>
             <a class="hx-btn-ghost" href="mailto:hello@cairnly.studio">Email us</a>
@@ -69,42 +68,6 @@
             <span>Our promise on every project</span>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Live chat -->
-  <section class="chat-section" id="chat" aria-labelledby="chat-title">
-    <div class="shell chat-grid">
-      <div class="chat-copy">
-        <p class="eyebrow" data-mo-reveal>Live chat</p>
-        <h2 id="chat-title" data-mo-reveal>ASK <em>anything.</em></h2>
-        <p class="chat-intro" data-mo-reveal>Tell us what you're working on. We'll ask a couple of questions, give you a straight answer on scope, timing and a price range, and agree a next step, usually a short call.</p>
-
-        <ol class="chat-points">
-          <li data-mo-reveal style="--mo-delay:.05s"><span>01</span><div><strong>Say what you need</strong><p>A new site, a redesign, an automation, or just a question.</p></div></li>
-          <li data-mo-reveal style="--mo-delay:.12s"><span>02</span><div><strong>Get real answers</strong><p>From the person who will design or build it.</p></div></li>
-          <li data-mo-reveal style="--mo-delay:.19s"><span>03</span><div><strong>Leave with a next step</strong><p>A call, a written proposal, or an honest “you don't need us.”</p></div></li>
-        </ol>
-
-        <div class="chat-reach" data-mo-reveal>
-          <a class="text-link" href="mailto:hello@cairnly.studio">Prefer email? hello@cairnly.studio
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
-          </a>
-          <p>We only use your details to reply to you. No mailing lists, and no obligation to hire us.</p>
-        </div>
-      </div>
-
-      <div class="chat-stage" data-mo-reveal>
-        <div class="chat-slot" id="chat-slot">
-          <!-- chat.js mounts the live chat panel here -->
-          <noscript><div class="lc-noscript">Live chat needs JavaScript. Email us at <a href="mailto:hello@cairnly.studio">hello@cairnly.studio</a>.</div></noscript>
-        </div>
-        <ul class="chat-trust" aria-label="What to expect">
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>Real people, not a bot</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>History saved on this device</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>No obligation</li>
-        </ul>
       </div>
     </div>
   </section>
@@ -236,7 +199,7 @@
       </div>
 
       <div class="re-service-list">
-        <a class="re-service" href="#chat" data-open-chat data-topic="A new website" data-mo-reveal>
+        <a class="re-service" href="/chat?topic=A%20new%20website" data-mo-reveal>
           <span class="re-index">01</span>
           <h3>Websites</h3>
           <span class="mo-icon" aria-hidden="true">
@@ -249,7 +212,7 @@
           <span class="re-service-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
         </a>
 
-        <a class="re-service" href="#chat" data-open-chat data-topic="AI automation" data-mo-reveal>
+        <a class="re-service" href="/chat?topic=AI%20automation" data-mo-reveal>
           <span class="re-index">02</span>
           <h3>AI automation</h3>
           <span class="mo-icon" aria-hidden="true">
@@ -259,7 +222,7 @@
           <span class="re-service-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
         </a>
 
-        <a class="re-service" href="#chat" data-open-chat data-topic="An AI chat assistant" data-mo-reveal>
+        <a class="re-service" href="/chat?topic=An%20AI%20chat%20assistant" data-mo-reveal>
           <span class="re-index">03</span>
           <h3>AI chat &amp; support agents</h3>
           <span class="mo-icon" aria-hidden="true">
@@ -269,7 +232,7 @@
           <span class="re-service-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
         </a>
 
-        <a class="re-service" href="#chat" data-open-chat data-topic="Integrations" data-mo-reveal>
+        <a class="re-service" href="/chat?topic=Integrations" data-mo-reveal>
           <span class="re-index">04</span>
           <h3>Integrations &amp; dashboards</h3>
           <span class="mo-icon" aria-hidden="true">
@@ -330,7 +293,7 @@
       <div class="hx-faq-head">
         <p class="eyebrow" data-mo-reveal>FAQ</p>
         <h2 id="faq-title" data-mo-reveal>QUESTIONS, <em>answered.</em></h2>
-        <p data-mo-reveal>Anything else? <a href="#chat" data-open-chat>Ask us in the chat</a> or email <a href="mailto:hello@cairnly.studio">hello@cairnly.studio</a>.</p>
+        <p data-mo-reveal>Anything else? <a href="/chat">Ask us in the chat</a> or email <a href="mailto:hello@cairnly.studio">hello@cairnly.studio</a>.</p>
       </div>
       <div class="hx-faq-list">
         <details data-mo-reveal><summary>How much does a project cost?<i aria-hidden="true"></i></summary><p>We quote each project after a short conversation, once we know the pages, features or workflows involved. You get a fixed price in writing before any work begins, and it doesn't change unless the scope does.</p></details>
@@ -348,7 +311,7 @@
   <section class="re-invitation mo-cursor-zone" aria-labelledby="invite-title">
     <div class="shell">
       <p class="eyebrow">Start here</p>
-      <a class="re-invitation-link" href="#chat" data-open-chat>
+      <a class="re-invitation-link" href="/chat">
         <h2 id="invite-title">START A <em>chat.</em></h2>
         <span class="re-circle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
       </a>
@@ -368,7 +331,7 @@
       <a class="wordmark" href="/">Cairnly<span>.</span></a>
       <p>Websites and AI automation for businesses<br>that want both done properly.</p>
       <nav class="footer-nav" aria-label="Footer">
-        <a href="#services">Services</a><a href="#process">Process</a><a href="#faq">Questions</a><a href="#chat" data-open-chat>Live chat</a>
+        <a href="#services">Services</a><a href="#process">Process</a><a href="#faq">Questions</a><a href="/chat">Live chat</a>
       </nav>
       <a class="footer-contact" href="mailto:hello@cairnly.studio">hello@cairnly.studio</a>
     </div>
@@ -382,16 +345,14 @@
 
 <div class="mo-cursor" aria-hidden="true">Chat <svg viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></svg></div>
 
-<!-- Floating launcher + drawer (the same chat panel moves between the page slot and this drawer) -->
-<button class="lc-launcher" type="button" aria-controls="lc-drawer" aria-expanded="false" data-launcher hidden>
-  <span class="lc-launcher-avatars" data-launcher-avatars aria-hidden="true"></span>
-  <span class="lc-launcher-text"><strong>Chat with the team</strong><small data-launcher-status>Replies in minutes</small></span>
-  <span class="lc-launcher-badge" data-launcher-badge hidden>1</span>
-</button>
-<div class="lc-drawer" id="lc-drawer" role="dialog" aria-modal="false" aria-label="Live chat" data-drawer hidden></div>
+<!-- Floating link to the chat page (status filled in by presence.js) -->
+<a class="lc-launcher is-away" href="/chat" data-launcher>
+  <span class="lc-launcher-avatars" data-launcher-avatars aria-hidden="true"><span>C.</span></span>
+  <span class="lc-launcher-text"><strong data-launcher-label>Chat with the team</strong><small data-launcher-status>Replies in minutes</small></span>
+  <svg class="lc-launcher-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
+</a>
 
-<script src="/socket.io/socket.io.min.js" defer></script>
-<script src="/js/chat.js" type="module"></script>
+<script src="/js/presence.js" type="module"></script>
 <script src="/js/site.js" type="module"></script>
 </body>
 </html>

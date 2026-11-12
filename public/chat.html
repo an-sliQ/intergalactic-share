@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" class="chat-doc">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Live chat | Cairnly, websites and AI automation</title>
+  <meta name="description" content="Chat live with the Cairnly team about a website or an AI automation. Real people, real time, and a straight answer on scope, timing and price.">
+  <meta name="theme-color" content="#f2f0e7">
+  <meta property="og:title" content="Live chat with the team | Cairnly">
+  <meta property="og:description" content="Websites and AI automation. Chat with the people who will build it.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/fraunces-latin-wght-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/chat.css">
+  <script>document.documentElement.classList.add('mo','gx');</script>
+</head>
+<body class="chat-body">
+<a class="skip" href="#lc-input">Skip to the message box</a>
+
+<div class="chat-app">
+  <!-- Phones: slim app bar instead of the full masthead -->
+  <div class="chat-bar">
+    <a class="chat-bar-back" href="/" aria-label="Back to the Cairnly home page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg>
+    </a>
+    <a class="wordmark" href="/">Cairnly<span>.</span></a>
+    <a class="chat-bar-mail" href="mailto:hello@cairnly.studio">Email</a>
+  </div>
+
+  <header class="mast chat-mast">
+    <div class="shell nav-inner">
+      <a class="wordmark" href="/" aria-label="Cairnly, home">Cairnly<span>.</span></a>
+      <nav aria-label="Main">
+        <a href="/#services">Services</a>
+        <a href="/#process">Process</a>
+        <a href="/#faq">Questions</a>
+        <a href="mailto:hello@cairnly.studio">Email</a>
+        <a class="nav-back" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg>Back to site</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="chat-main">
+    <div class="shell chat-grid">
+      <div class="chat-copy">
+        <div class="chat-eyebrow-row" data-mo-reveal>
+          <p class="eyebrow">Live chat</p>
+          <p class="presence-line" data-presence-line><span class="status-dot" aria-hidden="true"></span><span data-presence-text>Checking who's online</span></p>
+        </div>
+        <h1 id="chat-title" data-mo-reveal style="--mo-delay:.05s">ASK <em>anything.</em></h1>
+        <p class="chat-intro" data-mo-reveal style="--mo-delay:.1s">Tell us what you're working on. We'll ask a couple of questions, give you a straight answer on scope, timing and a price range, and agree a next step, usually a short call.</p>
+
+        <ol class="chat-points">
+          <li data-mo-reveal style="--mo-delay:.15s"><span>01</span><div><strong>Say what you need</strong><p>A new site, a redesign, an automation, or just a question.</p></div></li>
+          <li data-mo-reveal style="--mo-delay:.2s"><span>02</span><div><strong>Get real answers</strong><p>From the person who will design or build it.</p></div></li>
+          <li data-mo-reveal style="--mo-delay:.25s"><span>03</span><div><strong>Leave with a next step</strong><p>A call, a written proposal, or an honest “you don't need us.”</p></div></li>
+        </ol>
+
+        <div class="chat-reach" data-mo-reveal style="--mo-delay:.3s">
+          <a class="text-link" href="mailto:hello@cairnly.studio">Prefer email? hello@cairnly.studio
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
+          </a>
+          <p>We only use your details to reply to you. No mailing lists, and no obligation to hire us.</p>
+        </div>
+      </div>
+
+      <div class="chat-stage">
+        <div class="chat-slot" id="chat-slot" aria-labelledby="chat-title">
+          <!-- chat.js mounts the live chat panel here -->
+          <noscript><div class="lc-noscript">Live chat needs JavaScript. Email us at <a href="mailto:hello@cairnly.studio">hello@cairnly.studio</a>.</div></noscript>
+        </div>
+        <ul class="chat-trust" aria-label="What to expect">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>Real people, not a bot</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>History saved on this device</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>No obligation</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer class="chat-foot">
+    <div class="shell">
+      <span>© <span data-year>2026</span> Cairnly Studio</span>
+      <p>Chat messages are stored only to answer you. Ask in the chat or by email and we'll delete them.</p>
+    </div>
+  </footer>
+</div>
+
+<script src="/socket.io/socket.io.min.js" defer></script>
+<script src="/js/chat.js" type="module"></script>
+<script src="/js/site.js" type="module"></script>
+</body>
+</html>

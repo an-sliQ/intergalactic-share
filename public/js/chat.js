@@ -1,4 +1,4 @@
-// Live chat, visitor side. One panel that lives in the page (#chat-slot) or the floating drawer.
+// Live chat, visitor side. Runs on the /chat page and mounts the panel into #chat-slot.
 import { prepareFile, uploadFile, makeUrlCache, attachmentNode, uploadingNode, wireFileInputs, ICON_CLIP } from './attachments.js';
 const TEAM_NAME = 'Cairnly team';
 const STORE_KEY = 'cairnly.chat.v1';
@@ -10,6 +10,7 @@ const QUICK_STARTS = [
   { label: 'Get a price estimate', topic: 'Price estimate' },
   { label: 'Just exploring', topic: 'Exploring' },
 ];
+const LINK_TOPICS = [...QUICK_STARTS.map((q) => q.topic), 'Integrations'];
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, attrs = {}, ...children) => {
@@ -26,7 +27,6 @@ const el = (tag, attrs = {}, ...children) => {
 };
 const svg = (markup) => { const t = document.createElement('template'); t.innerHTML = markup.trim(); return t.content.firstChild; };
 const ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg>';
-const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4L19 7"/></svg>';
 const ICON_SEEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12.5l4 4 8.5-9M10.5 16.5l1 0 8.5-9"/></svg>';
 
@@ -64,7 +64,6 @@ const state = {
   agentReadAt: 0,
   agentTyping: null,
   topic: null,
-  mode: 'inline',
   unread: 0,
   pending: new Map(),
   features: { files: false, fileMaxMb: 10, accept: '' },
@@ -72,8 +71,6 @@ const state = {
 
 // ---------------------------------------------------------------- DOM
 const slot = $('#chat-slot');
-const drawer = $('[data-drawer]');
-const launcher = $('[data-launcher]');
 if (!slot) throw new Error('chat slot missing');
 
 const ui = {};
@@ -82,8 +79,6 @@ function buildPanel() {
   ui.statusText = el('span', { text: 'Connecting…' });
   ui.status = el('span', { class: 'lc-status' }, el('i', { class: 'status-dot' }), ui.statusText);
   ui.conn = el('span', { class: 'lc-conn', text: 'Reconnecting' });
-  ui.close = el('button', { class: 'lc-close', type: 'button', 'aria-label': 'Close chat', onclick: () => closeDrawer() });
-  ui.close.append(svg(ICON_CLOSE));
   ui.thread = el('div', { class: 'lc-thread', role: 'log', 'aria-live': 'polite', 'aria-label': 'Conversation', tabindex: '0' });
   ui.input = el('textarea', { id: 'lc-input', rows: '1', placeholder: 'Write a message…', maxlength: '4000', autocomplete: 'off', enterkeyhint: 'send' });
   ui.send = el('button', { class: 'lc-send', type: 'submit', 'aria-label': 'Send message', disabled: true });
@@ -94,9 +89,9 @@ function buildPanel() {
   ui.file.addEventListener('change', () => { const f = [...ui.file.files]; ui.file.value = ''; sendFiles(f); });
   ui.form = el('form', { class: 'lc-compose', novalidate: true },
     el('label', { class: 'sr-only', for: 'lc-input', text: 'Message' }), ui.attach, ui.file, ui.input, ui.send);
-  ui.panel = el('div', { class: 'lc', 'data-mode': 'inline' },
+  ui.panel = el('div', { class: 'lc', 'data-mode': 'page' },
     el('header', { class: 'lc-head' }, ui.avatars,
-      el('div', { class: 'lc-title' }, el('strong', { text: TEAM_NAME }), ui.status), ui.conn, ui.close),
+      el('div', { class: 'lc-title' }, el('strong', { text: TEAM_NAME }), ui.status), ui.conn),
     ui.thread,
     ui.form,
     el('p', { class: 'lc-foot' },
@@ -134,11 +129,6 @@ function renderHeader() {
   // Page-wide presence indicators
   const line = $('[data-presence-line]');
   if (line) { line.classList.toggle('is-online', online); $('[data-presence-text]').textContent = online ? 'Team online now, replies in minutes' : 'Team away, we reply within hours'; }
-  if (launcher) {
-    launcher.classList.toggle('is-online', online);
-    $('[data-launcher-status]').textContent = online ? 'Online now, replies in minutes' : 'Leave a message, we reply by email';
-    $('[data-launcher-avatars]').replaceChildren(...(online && agents.length ? agents.slice(0, 2).map((a) => el('span', { text: initials(a) })) : [el('span', { text: 'C.' })]));
-  }
 }
 
 function renderWelcome() {
@@ -356,9 +346,7 @@ function signalTyping() {
 function stopTyping() { clearTimeout(typingTimer); if (typingOn) { typingOn = false; state.socket?.emit('typing', false); } }
 
 // ---------------------------------------------------------------- visibility, read receipts, unread
-let inlineVisible = false;
-let heroVisible = true;
-function panelVisible() { return document.visibilityState === 'visible' && (state.mode === 'drawer' || inlineVisible); }
+function panelVisible() { return document.visibilityState === 'visible'; }
 function markReadIfVisible() {
   if (!panelVisible()) return;
   if (state.messages.some((m) => m.sender === 'agent' && !m.readAt)) {
@@ -369,10 +357,7 @@ function markReadIfVisible() {
 }
 function setUnread(n) {
   state.unread = n;
-  const badge = $('[data-launcher-badge]');
-  if (badge) { badge.hidden = n === 0; badge.textContent = String(n); }
   document.title = n ? `(${n}) New reply · ${baseTitle}` : baseTitle;
-  updateLauncher();
 }
 const baseTitle = document.title;
 
@@ -386,82 +371,44 @@ function chime() {
   } catch {}
 }
 
-// ---------------------------------------------------------------- drawer & launcher
-function updateLauncher() {
-  if (!launcher) return;
-  launcher.hidden = false;
-  launcher.classList.toggle('is-away', (heroVisible && !state.unread) || inlineVisible || state.mode === 'drawer');
-  launcher.setAttribute('aria-expanded', String(state.mode === 'drawer'));
-}
-function openDrawer() {
-  if (state.mode === 'drawer') { ui.input.focus(); return; }
-  state.mode = 'drawer';
-  ui.panel.dataset.mode = 'drawer';
-  drawer.hidden = false;
-  drawer.append(ui.panel);
-  drawer.classList.remove('is-leaving'); drawer.classList.add('is-entering');
-  if (matchMedia('(max-width:650px)').matches) document.documentElement.classList.add('menu-locked');
-  fitDrawer();
-  scrollToBottom(true);
-  updateLauncher();
-  markReadIfVisible();
-  setTimeout(() => ui.input.focus({ preventScroll: true }), 60);
-}
-function closeDrawer() {
-  if (state.mode !== 'drawer') return;
-  drawer.classList.remove('is-entering'); drawer.classList.add('is-leaving');
-  document.documentElement.classList.remove('menu-locked');
-  const done = () => {
-    drawer.hidden = true; drawer.classList.remove('is-leaving');
-    state.mode = 'inline'; ui.panel.dataset.mode = 'inline'; fitDrawer();
-    slot.append(ui.panel); scrollToBottom(true); updateLauncher();
-    launcher?.focus({ preventScroll: true });
-  };
-  matchMedia('(prefers-reduced-motion: reduce)').matches ? done() : setTimeout(done, 280);
-}
-launcher?.addEventListener('click', openDrawer);
-
-// Phones: keep the full-screen chat exactly the size of the visible area, so the
-// on-screen keyboard never covers the message box (iOS doesn't resize 100dvh for it).
+// ---------------------------------------------------------------- page
+// Phones: the chat fills the screen. Size it to the visible area so the on-screen
+// keyboard never covers the message box (iOS doesn't shrink 100dvh for the keyboard).
 const vv = window.visualViewport;
 const phone = matchMedia('(max-width:650px)');
-function fitDrawer() {
-  if (!vv || state.mode !== 'drawer' || !phone.matches) { drawer.style.removeProperty('--vvh'); drawer.style.removeProperty('top'); return; }
-  drawer.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
-  drawer.style.top = `${Math.round(vv.offsetTop)}px`;
+const root = document.documentElement;
+function fitViewport() {
+  if (!vv || !phone.matches) { root.style.removeProperty('--vvh'); root.style.removeProperty('--vvt'); return; }
+  root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+  root.style.setProperty('--vvt', `${Math.round(vv.offsetTop)}px`);
   if (document.activeElement === ui.input) scrollToBottom(true);
 }
-vv?.addEventListener('resize', fitDrawer);
-vv?.addEventListener('scroll', fitDrawer);
-phone.addEventListener?.('change', fitDrawer);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.mode === 'drawer') closeDrawer(); });
+vv?.addEventListener('resize', fitViewport);
+vv?.addEventListener('scroll', fitViewport);
+phone.addEventListener?.('change', fitViewport);
 
-// Any "start a chat" link: scroll to the in-page chat when it's above it, otherwise open the drawer.
-document.addEventListener('click', (e) => {
-  const a = e.target.closest('[data-open-chat]');
-  if (!a) return;
-  e.preventDefault();
-  const topic = a.dataset.topic;
-  if (topic && !ui.input.value) { state.topic = topic; ui.input.value = `Hi, I'm interested in ${topic.toLowerCase()}. `; autosize(); ui.send.disabled = false; }
-  document.querySelector('.mast.menu-open .menu-toggle')?.click();
-  const slotTop = slot.getBoundingClientRect().top + scrollY;
-  const linkTop = a.getBoundingClientRect().top + scrollY;
-  if (state.mode !== 'drawer' && linkTop < slotTop) {
-    const target = matchMedia('(max-width:900px)').matches ? slot : $('#chat');
-    target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-    setTimeout(() => { ui.input.focus({ preventScroll: true }); const v = ui.input.value; ui.input.setSelectionRange(v.length, v.length); }, 650);
-  } else {
-    openDrawer();
-  }
-});
+// Links like /chat?topic=AI%20automation pre-fill the first message (known topics only).
+function applyLinkTopic() {
+  const params = new URLSearchParams(location.search);
+  const topic = params.get('topic');
+  if (!params.has('topic')) return;
+  history.replaceState(null, '', location.pathname + location.hash); // a reload shouldn't refill the box
+  if (!LINK_TOPICS.includes(topic) || state.messages.some((m) => m.sender === 'visitor')) return;
+  state.topic = topic;
+  const phrase = topic.split(' ').map((w) => (w.length > 1 && w === w.toUpperCase() ? w : w.toLowerCase())).join(' '); // keeps "AI"
+  ui.input.value = `Hi, I'm interested in ${phrase}. `;
+  autosize(); ui.send.disabled = false;
+}
 
-new IntersectionObserver((entries) => {
-  for (const en of entries) inlineVisible = en.isIntersecting && en.intersectionRatio > 0.25;
-  updateLauncher(); markReadIfVisible();
-}, { threshold: [0, 0.25, 0.5] }).observe(slot);
+// Ready to type straight away on computers. Phones wait for a tap, so the keyboard doesn't hide the welcome.
+function focusComposer() {
+  if (!matchMedia('(hover:hover) and (pointer:fine)').matches) return;
+  ui.input.focus({ preventScroll: true });
+  const v = ui.input.value; ui.input.setSelectionRange(v.length, v.length);
+}
+
 document.addEventListener('visibilitychange', markReadIfVisible);
-const hero = document.querySelector('.ed-opening');
-if (hero) new IntersectionObserver(([en]) => { heroVisible = en.isIntersecting; updateLauncher(); }, { rootMargin: '0px 0px -40% 0px' }).observe(hero);
+addEventListener('focus', markReadIfVisible);
 
 // ---------------------------------------------------------------- socket
 function authPayload() { return state.conversationId && state.token ? { role: 'visitor', conversationId: state.conversationId, token: state.token } : { role: 'visitor' }; }
@@ -522,5 +469,7 @@ function connect() {
 buildPanel();
 renderHeader();
 renderAll();
-updateLauncher();
+applyLinkTopic();
+fitViewport();
+focusComposer();
 connect();

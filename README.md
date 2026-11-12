@@ -1,6 +1,6 @@
 # Cairnly: contact page with realtime live chat
 
-A conversion-focused contact page for a websites and AI automation studio. Visitors chat with the team **in real time** on the page, and the team answers from a private **inbox** at `/inbox`.
+A conversion-focused contact page for a websites and AI automation studio. Every "Start a chat" button opens the live chat page at `/chat`, where visitors talk to the team **in real time**. The team answers from a private **inbox** at `/inbox`.
 
 The visual system follows the editorial style of endcap.design: paper `#f2f0e7`, ink `#181a17` and acid `#dce87a`, Hanken Grotesk at 900 weight with Fraunces italic accents, square corners, and motion on `cubic-bezier(.32,.72,0,1)` and spring `cubic-bezier(.34,1.56,.64,1)`.
 
@@ -66,9 +66,10 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 ```
 server/index.js     Express + Socket.IO: pages, login, realtime events, presence, webhook
 server/db.js        SQLite schema and queries
-public/index.html   Contact page
+public/index.html   Contact page (home)
+public/chat.html    Live chat page (/chat; service links pass ?topic=…)
 public/inbox.html   Team inbox
 public/css/         site.css (design system and sections), chat.css (chat panel), inbox.css
-public/js/          site.js (motion), chat.js (visitor chat), inbox.js (team inbox)
+public/js/          site.js (motion), presence.js (home page online status), chat.js (visitor chat), inbox.js (team inbox)
 public/fonts/       Hanken Grotesk and Fraunces variable fonts (OFL), self-hosted
 ```

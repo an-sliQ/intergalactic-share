@@ -311,6 +311,12 @@ app.post('/api/files', uploadAuth, express.raw({ type: () => true, limit: `${FIL
 // Called once a day by the free GitHub Action in .github/workflows/keepalive.yml (or any uptime pinger).
 // Wakes the server and touches Supabase at most every 6 hours, so a quiet week can't get the free project paused.
 let lastPing = 0;
+// Home page status line and floating chat link: is anyone on the team online?
+app.get('/api/presence', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(presence());
+});
+
 app.get('/api/keepalive', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!store.enabled) return res.json({ ok: true, supabase: 'off' });
@@ -333,12 +339,13 @@ const privatePage = (res) => {
 app.get(['/inbox', '/inbox.html'], (_req, res) => { privatePage(res); res.sendFile(join(PUBLIC_DIR, 'inbox.html')); });
 app.use(['/js/inbox.js', '/css/inbox.css'], (_req, res, next) => { res.setHeader('X-Robots-Tag', 'noindex'); next(); });
 
-// The contact page, with the contact email filled in from CONTACT_EMAIL.
-const indexHtml = readFileSync(join(PUBLIC_DIR, 'index.html'), 'utf8').replaceAll(DEFAULT_CONTACT_EMAIL, CONTACT_EMAIL);
-app.get(['/', '/index.html', '/index'], (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache');
-  res.type('html').send(indexHtml);
-});
+// Public pages, with the contact email filled in from CONTACT_EMAIL.
+const publicPage = (file, paths) => {
+  const html = readFileSync(join(PUBLIC_DIR, file), 'utf8').replaceAll(DEFAULT_CONTACT_EMAIL, CONTACT_EMAIL);
+  app.get(paths, (_req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.type('html').send(html); });
+};
+publicPage('index.html', ['/', '/index.html', '/index']);
+publicPage('chat.html', ['/chat', '/chat.html']);
 
 app.use(express.static(PUBLIC_DIR, {
   extensions: ['html'],
