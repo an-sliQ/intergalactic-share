@@ -16,7 +16,7 @@ Everything below is on free plans that **don't ask for a card**, so nothing here
 1. Sign in at **render.com** with GitHub. **Don't add a card.**
 2. **New → Blueprint** → pick `an-sliQ/intergalactic-share` and this branch. `render.yaml` already says `plan: free` (no disk).
 3. Render asks for values. For now fill only these and **leave the `SUPABASE_*` and `TEAM_EMAILS` boxes empty**:
-   - `PUBLIC_URL`: `https://plumb-contact.onrender.com` for now (your domain later).
+   - `PUBLIC_URL`: `https://cairnly-contact.onrender.com` for now (your domain later).
    - `INBOX_PASSWORD`: a team password of 12+ characters (temporary; Google replaces it in step 2).
 4. **Apply.** After 2–3 minutes, open the site and `/inbox`.
 
@@ -32,7 +32,7 @@ Everything below is on free plans that **don't ask for a card**, so nothing here
 1. Go to **supabase.com** → **Start your project** → sign in with GitHub.
 2. If asked to create an organization: any name, type **Personal**, plan **Free**.
 3. **New project**:
-   - Name: `plumb`
+   - Name: `cairnly`
    - Database password: click **Generate**, then save it in your password manager. The app doesn't use it, but you'd need it to manage the database later.
    - Region: **South Asia (Mumbai)** (closest to your visitors)
    - Leave the other options as they are → **Create new project**. It takes about a minute.
@@ -87,9 +87,9 @@ Google asks every site that offers "Continue with Google" to register once. It's
 Supabase → **Authentication → Sign In / Providers** (or **Providers**) → **Google**. Copy the **Callback URL** shown there. It looks like `https://abcdefghijkl.supabase.co/auth/v1/callback`. Leave this tab open.
 
 ### 2b. Register the app with Google
-1. Open **console.cloud.google.com** → project picker (top left) → **New project** → name `plumb-inbox` → **Create**, then select it.
+1. Open **console.cloud.google.com** → project picker (top left) → **New project** → name `cairnly-inbox` → **Create**, then select it.
 2. Search for **Google Auth Platform** (it's also under *APIs & Services → OAuth consent screen*) → **Get started**:
-   - App name: `Plumb inbox` · User support email: yours
+   - App name: `Cairnly inbox` · User support email: yours
    - Audience: **External**
    - Contact email: yours → agree → **Create**
 3. **Clients → Create client**:
@@ -103,8 +103,8 @@ Supabase → **Authentication → Sign In / Providers** (or **Providers**) → *
 1. Back in Supabase's **Google** provider tab: **Enable**, paste the **Client ID** and **Client secret** → **Save**.
 2. **Turn off email sign-ups:** in the same list open **Email** and switch the provider **off** → **Save**. Only Google should be able to create accounts. *(The app also refuses any sign-in that isn't through Google, so this is a second lock.)*
 3. **Authentication → URL Configuration**:
-   - **Site URL:** `https://plumb-contact.onrender.com/inbox`
-   - **Redirect URLs → Add URL:** `https://plumb-contact.onrender.com/inbox`
+   - **Site URL:** `https://cairnly-contact.onrender.com/inbox`
+   - **Redirect URLs → Add URL:** `https://cairnly-contact.onrender.com/inbox`
      Add `https://yourdomain.com/inbox` too when your domain is connected.
 
 ### 2d. Choose who gets in
@@ -121,7 +121,7 @@ Open `/inbox` → **Continue with Google**. Done. The password box disappears au
 Supabase pauses a free project after **7 days without activity**. A paused project keeps your data, but files and backups stop working until you click **Restore** in the Supabase dashboard (free). Every chat already counts as activity. This step covers quiet weeks:
 
 1. GitHub → your repo → **Settings → Secrets and variables → Actions → Variables** tab → **New repository variable**
-   - Name: `SITE_URL` · Value: `https://plumb-contact.onrender.com`
+   - Name: `SITE_URL` · Value: `https://cairnly-contact.onrender.com`
 2. That's it. The included workflow `.github/workflows/keepalive.yml` runs once a day. It wakes the site, and the site makes one tiny Supabase request. To test it now: repo → **Actions → Keep free services awake → Run workflow**.
 
 Notes:

@@ -1,13 +1,13 @@
-# /etc/systemd/system/plumb.service — keeps the app running and restarts it on crash or reboot.
+# /etc/systemd/system/cairnly.service — keeps the app running and restarts it on crash or reboot.
 [Unit]
-Description=Plumb contact page and live chat
+Description=Cairnly contact page and live chat
 After=network.target
 
 [Service]
-User=plumb
-WorkingDirectory=/opt/plumb
-EnvironmentFile=/opt/plumb/.env
-Environment=NODE_ENV=production HOST=127.0.0.1 PORT=3000 TRUST_PROXY=1 DB_FILE=/opt/plumb/.data/chat.db
+User=cairnly
+WorkingDirectory=/opt/cairnly
+EnvironmentFile=/opt/cairnly/.env
+Environment=NODE_ENV=production HOST=127.0.0.1 PORT=3000 TRUST_PROXY=1 DB_FILE=/opt/cairnly/.data/chat.db
 ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.js
 Restart=always
 RestartSec=3
@@ -24,7 +24,7 @@ RestrictSUIDSGID=true
 RestrictNamespaces=true
 LockPersonality=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-ReadWritePaths=/opt/plumb/.data
+ReadWritePaths=/opt/cairnly/.data
 UMask=0077
 
 [Install]

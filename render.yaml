@@ -6,7 +6,7 @@
 # (free, no card; see SETUP.md step 1). Until Supabase is set up, history resets each time the server sleeps.
 services:
   - type: web
-    name: plumb-contact
+    name: cairnly-contact
     runtime: node
     plan: free
     region: singapore

@@ -1,6 +1,6 @@
 // Team inbox: sign in, see conversations live, reply in real time.
 import { prepareFile, uploadFile, makeUrlCache, attachmentNode, uploadingNode, wireFileInputs } from './attachments.js';
-const AUTH_KEY = 'plumb.inbox.v1';
+const AUTH_KEY = 'cairnly.inbox.v1';
 const QUICK_REPLIES = [
   'Thanks for reaching out! Could you share your current website, if you have one?',
   'Do you have a timeline or launch date in mind?',
@@ -67,7 +67,7 @@ const state = {
   query: '',
   typing: new Map(), // conversationId -> bool
   presence: { agents: [] },
-  notify: localStorage.getItem('plumb.inbox.notify') === '1',
+  notify: localStorage.getItem('cairnly.inbox.notify') === '1',
   features: { files: false, fileMaxMb: 10, accept: '' },
 };
 
@@ -84,7 +84,7 @@ const loginReady = fetch('/api/config').then((r) => r.json()).then((c) => {
 }).catch(() => {});
 
 // ---- Google sign-in through Supabase (PKCE redirect: works on phones, no pop-ups, no SDK) ----
-const PKCE_KEY = 'plumb.inbox.pkce';
+const PKCE_KEY = 'cairnly.inbox.pkce';
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const redirectUrl = () => `${location.origin}/inbox`;
 
@@ -172,7 +172,7 @@ notifyBtn.addEventListener('click', async () => {
   if (!('Notification' in window)) { alert('This browser does not support notifications.'); return; }
   if (state.notify && Notification.permission === 'granted') { state.notify = false; }
   else { const p = await Notification.requestPermission(); state.notify = p === 'granted'; }
-  localStorage.setItem('plumb.inbox.notify', state.notify ? '1' : '0');
+  localStorage.setItem('cairnly.inbox.notify', state.notify ? '1' : '0');
   renderNotifyBtn();
 });
 
@@ -204,7 +204,7 @@ function renderList() {
     c.unread ? el('span', { class: 'ib-badge', text: String(c.unread) }) : null);
   }));
   const total = all.reduce((n, c) => n + (c.unread || 0), 0);
-  document.title = total ? `(${total}) Inbox | Plumb` : 'Inbox | Plumb';
+  document.title = total ? `(${total}) Inbox | Cairnly` : 'Inbox | Cairnly';
 }
 $$('[data-filter]').forEach((b) => b.addEventListener('click', () => {
   state.filter = b.dataset.filter;
@@ -365,7 +365,7 @@ function renderDetails() {
       row('Browser', browserName(c.userAgent)),
       row('First message', c.createdAt ? fullFmt.format(c.createdAt) : null),
       row('Status', c.online ? 'On the page now' : 'Not on the page')),
-    c.email ? el('a', { class: 'hx-btn', href: `mailto:${c.email}?subject=${encodeURIComponent('Following up on your chat with Plumb')}` }, 'Email a follow-up', el('span', { text: '→' })) : null,
+    c.email ? el('a', { class: 'hx-btn', href: `mailto:${c.email}?subject=${encodeURIComponent('Following up on your chat with Cairnly')}` }, 'Email a follow-up', el('span', { text: '→' })) : null,
     el('button', { class: 'ib-ghost', type: 'button', style: 'margin-top:10px;width:100%', text: 'Hide details', onclick: () => { box.hidden = true; } })].filter(Boolean));
 }
 $('[data-t-details]').addEventListener('click', () => { const box = $('[data-details]'); box.hidden = !box.hidden; renderDetails(); });

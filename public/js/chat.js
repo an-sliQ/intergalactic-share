@@ -1,7 +1,7 @@
 // Live chat, visitor side. One panel that lives in the page (#chat-slot) or the floating drawer.
 import { prepareFile, uploadFile, makeUrlCache, attachmentNode, uploadingNode, wireFileInputs, ICON_CLIP } from './attachments.js';
-const TEAM_NAME = 'Plumb team';
-const STORE_KEY = 'plumb.chat.v1';
+const TEAM_NAME = 'Cairnly team';
+const STORE_KEY = 'cairnly.chat.v1';
 const QUICK_STARTS = [
   { label: 'I need a new website', topic: 'A new website' },
   { label: 'Redesign my current site', topic: 'Website redesign' },
@@ -126,7 +126,7 @@ function scrollToBottom(force = false) { if (force || nearBottom()) requestAnima
 
 function renderHeader() {
   const { online, agents } = state.presence;
-  ui.avatars.replaceChildren(...(online && agents.length ? agents.slice(0, 3).map((a) => el('span', { text: initials(a) })) : [el('span', { text: 'P.' })]));
+  ui.avatars.replaceChildren(...(online && agents.length ? agents.slice(0, 3).map((a) => el('span', { text: initials(a) })) : [el('span', { text: 'C.' })]));
   ui.status.classList.toggle('is-online', online);
   ui.statusText.textContent = !state.connected && !state.socket?.connected ? 'Connecting…'
     : online ? `${agents.length === 1 ? `${agents[0]} is online` : agents.length > 1 ? `${agents[0]} +${agents.length - 1} online` : 'Online now'} · replies in minutes`
@@ -137,7 +137,7 @@ function renderHeader() {
   if (launcher) {
     launcher.classList.toggle('is-online', online);
     $('[data-launcher-status]').textContent = online ? 'Online now, replies in minutes' : 'Leave a message, we reply by email';
-    $('[data-launcher-avatars]').replaceChildren(...(online && agents.length ? agents.slice(0, 2).map((a) => el('span', { text: initials(a) })) : [el('span', { text: 'P.' })]));
+    $('[data-launcher-avatars]').replaceChildren(...(online && agents.length ? agents.slice(0, 2).map((a) => el('span', { text: initials(a) })) : [el('span', { text: 'C.' })]));
   }
 }
 

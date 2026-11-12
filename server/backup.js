@@ -57,7 +57,7 @@ export function startBackups({ store, db, intervalSec = 180, keepDays = 14, safe
       const before = db.changeCounter();
       if (!force && before === state.lastChange) return false;
       store.persistUsage(); // counters ride along inside the backup
-      const tmp = join(tmpdir(), `plumb-backup-${process.pid}-${Date.now()}.db`);
+      const tmp = join(tmpdir(), `cairnly-backup-${process.pid}-${Date.now()}.db`);
       try {
         db.snapshot(tmp);
         const gz = gzipSync(readFileSync(tmp), { level: 9 });

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Plumb, contact page. Design tokens, type scale and motion curves follow the
+   Cairnly, contact page. Design tokens, type scale and motion curves follow the
    endcap.design editorial system: paper, ink, acid; heavy grotesk + Fraunces italic.
    ========================================================================== */
 
@@ -323,7 +323,7 @@ html.gx .hx-step.is-in .hx-block{opacity:1;transform:none}
 .footer-nav{display:flex;gap:22px;margin-left:auto;font-size:13px;font-weight:600}
 .footer-nav a:hover,.footer-contact:hover{text-decoration:underline;text-underline-offset:4px}
 .footer-contact{font-size:13px;font-weight:700}
-.ed-signoff{font-family:var(--display);font-size:clamp(120px,24.6vw,365px);line-height:.89;letter-spacing:-.075em;font-weight:900;margin-top:60px;white-space:nowrap;user-select:none}
+.ed-signoff{font-family:var(--display);font-size:clamp(120px,30.4vw,450px);line-height:.89;letter-spacing:-.075em;font-weight:900;margin-top:60px;padding-bottom:.21em;white-space:nowrap;user-select:none}
 .ed-signoff>span:last-child{color:var(--olive);display:inline-block}
 .mo-letter{display:inline-block;transition:transform .6s var(--spring),color .3s}
 html.mo .ed-signoff .mo-letter{transform:translateY(60%);filter:opacity(0);transition:transform 1s var(--spring) calc(var(--i)*.06s),filter .6s var(--ease) calc(var(--i)*.06s)}
@@ -426,7 +426,7 @@ html.mo .chat-stage[data-mo-reveal].is-in{transform:none}
   .re-invitation h2{font-size:clamp(49px,15vw,82px)}
   .re-circle{width:56px;height:56px}.re-circle svg{width:26px;height:26px}
   .re-invitation-bottom{flex-direction:column;align-items:flex-start}
-  .ed-signoff{font-size:28vw;margin-top:37px;letter-spacing:-.065em}
+  .ed-signoff{font-size:28.5vw;margin-top:37px;letter-spacing:-.065em}
   .footer-top .wordmark{font-size:37px}
   .footer-bottom{flex-direction:column;gap:8px}
 }

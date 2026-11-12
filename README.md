@@ -1,4 +1,4 @@
-# Plumb: contact page with realtime live chat
+# Cairnly: contact page with realtime live chat
 
 A conversion-focused contact page for a websites and AI automation studio. Visitors chat with the team **in real time** on the page, and the team answers from a private **inbox** at `/inbox`.
 
@@ -35,7 +35,7 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `INBOX_PASSWORD` | `plumb-demo` | Team password for `/inbox`. **Change it** (12+ characters; required in production). Changing it signs everyone out. |
+| `INBOX_PASSWORD` | `cairnly-demo` | Team password for `/inbox`. **Change it** (12+ characters; required in production). Changing it signs everyone out. |
 | `SESSION_SECRET` | random per boot | Signs inbox sessions. Set it so sign-ins survive restarts. |
 | `NOTIFY_WEBHOOK_URL` | none | Slack or Discord incoming webhook. Pings on new chats, and on messages while nobody is online. |
 | `PUBLIC_URL` | none | e.g. `https://example.com`. Adds an inbox link to webhook pings. |
@@ -56,7 +56,7 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 
 ## Before launch
 
-- Replace the brand name **Plumb**, `hello@plumb.studio`, and the copy in `public/index.html`. The chat team name is `TEAM_NAME` in `public/js/chat.js`.
+- Replace the brand name **Cairnly**, `hello@cairnly.studio`, and the copy in `public/index.html`. The chat team name is `TEAM_NAME` in `public/js/chat.js`.
 - **The three client quotes in “In their words” are placeholders.** Replace them with real client words, or remove the section.
 - Host on anything that runs a long-lived Node process with WebSockets (Render, Railway, Fly.io, a VPS). Serverless-only hosts such as Vercel functions won't keep sockets open. Put `.data/` on a persistent disk.
 

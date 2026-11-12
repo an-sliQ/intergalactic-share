@@ -23,7 +23,7 @@ The live chat needs a server that **stays running** and keeps WebSocket connecti
    - `INBOX_PASSWORD`: the team password for `/inbox`, at least 12 characters (the app won't start with a weak one).
    - `PUBLIC_URL`: `https://yourdomain.com` (or your subdomain).
    - `NOTIFY_WEBHOOK_URL`: optional Slack or Discord webhook. Leave it empty if you don't need one.
-4. Click **Apply**. In 2–3 minutes the site is live at `https://plumb-contact.onrender.com`. Open it and `/inbox` to check.
+4. Click **Apply**. In 2–3 minutes the site is live at `https://cairnly-contact.onrender.com`. Open it and `/inbox` to check.
 
 `render.yaml` already sets the Singapore region (closest to India), the **Free** plan, a generated `SESSION_SECRET`, production security mode, real-visitor-IP detection, and health checks. The free plan has no disk, so chat history is restored from Supabase Storage on every start ([SETUP.md](SETUP.md), step 1).
 
@@ -34,8 +34,8 @@ The live chat needs a server that **stays running** and keeps WebSocket connecti
 | You're using | Type | Name / Host | Value |
 |---|---|---|---|
 | Root domain `yourdomain.com` | **A** | `@` | `216.24.57.1` |
-| `www.yourdomain.com` | **CNAME** | `www` | `plumb-contact.onrender.com` |
-| A subdomain, e.g. `talk.yourdomain.com` | **CNAME** | `talk` | `plumb-contact.onrender.com` |
+| `www.yourdomain.com` | **CNAME** | `www` | `cairnly-contact.onrender.com` |
+| A subdomain, e.g. `talk.yourdomain.com` | **CNAME** | `talk` | `cairnly-contact.onrender.com` |
 
 3. **Delete** any other `A` or `AAAA` records for the same name. Render uses IPv4 only, and leftover records block the HTTPS certificate.
 4. **On Cloudflare:** set the record to **DNS only** (grey cloud) until Render shows the domain as verified. Keep it that way: Render already runs behind Cloudflare.
@@ -59,17 +59,17 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/
 apt update && apt install -y caddy
 
 # App
-git clone -b arena/07be7b4b-intergalactic-share https://github.com/an-sliQ/intergalactic-share.git /opt/plumb
-useradd --system --no-create-home --home-dir /opt/plumb plumb
-cd /opt/plumb && npm ci --omit=dev
+git clone -b arena/07be7b4b-intergalactic-share https://github.com/an-sliQ/intergalactic-share.git /opt/cairnly
+useradd --system --no-create-home --home-dir /opt/cairnly cairnly
+cd /opt/cairnly && npm ci --omit=dev
 cp .env.example .env && nano .env        # set INBOX_PASSWORD (12+ chars), SESSION_SECRET (openssl rand -hex 32), PUBLIC_URL
 chmod 600 .env
-mkdir -p .data && chown -R plumb:plumb /opt/plumb
+mkdir -p .data && chown -R cairnly:cairnly /opt/cairnly
 
 # Run it forever
-cp deploy/plumb.service /etc/systemd/system/plumb.service
-systemctl daemon-reload && systemctl enable --now plumb
-systemctl status plumb --no-pager
+cp deploy/cairnly.service /etc/systemd/system/cairnly.service
+systemctl daemon-reload && systemctl enable --now cairnly
+systemctl status cairnly --no-pager
 
 # HTTPS on your domain
 cp deploy/Caddyfile /etc/caddy/Caddyfile && nano /etc/caddy/Caddyfile   # replace yourdomain.com
@@ -78,9 +78,9 @@ systemctl reload caddy
 
 Open `https://yourdomain.com`; Caddy fetches the certificate on the first request.
 
-**Updating later:** `cd /opt/plumb && git pull && npm ci --omit=dev && chown -R plumb:plumb /opt/plumb && systemctl restart plumb`
+**Updating later:** `cd /opt/cairnly && git pull && npm ci --omit=dev && chown -R cairnly:cairnly /opt/cairnly && systemctl restart cairnly`
 (If the repo is private, use a GitHub deploy key or a personal access token for the clone.)
-**Backups:** set `SUPABASE_URL` + `SUPABASE_SECRET_KEY` (see [SETUP.md](SETUP.md), step 1) for automatic off-site backups, or copy `/opt/plumb/.data/chat.db` with a nightly cron job.
+**Backups:** set `SUPABASE_URL` + `SUPABASE_SECRET_KEY` (see [SETUP.md](SETUP.md), step 1) for automatic off-site backups, or copy `/opt/cairnly/.data/chat.db` with a nightly cron job.
 
 ---
 
@@ -88,7 +88,7 @@ Open `https://yourdomain.com`; Caddy fetches the certificate on the first reques
 
 - [ ] Read [SECURITY.md](SECURITY.md) → “Your part” (production mode, strong password, real-IP header for your host).
 
-- [ ] Replace **Plumb**, `hello@plumb.studio` and the placeholder client quotes in `public/index.html`. The chat's team name is `TEAM_NAME` in `public/js/chat.js`.
+- [ ] Replace **Cairnly**, `hello@cairnly.studio` and the placeholder client quotes in `public/index.html`. The chat's team name is `TEAM_NAME` in `public/js/chat.js`.
 - [ ] Optional free add-ons in [SETUP.md](SETUP.md): Google sign-in for the team, file sharing, automatic backups.
 - [ ] Open `/inbox` on your phone and laptop, sign in, and click **Turn on alerts**. Visitors see you as online whenever an inbox tab is open.
 - [ ] Optional: set `NOTIFY_WEBHOOK_URL` so new chats ping your Slack or Discord when nobody has the inbox open.

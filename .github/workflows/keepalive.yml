@@ -3,7 +3,7 @@
 #
 # Cost: free. Public repositories get unlimited GitHub Actions minutes, and this job takes a few seconds.
 # Turn it on: GitHub repo → Settings → Secrets and variables → Actions → Variables → New repository variable
-#   Name: SITE_URL    Value: https://your-site (e.g. https://plumb-contact.onrender.com)
+#   Name: SITE_URL    Value: https://your-site (e.g. https://cairnly-contact.onrender.com)
 # Without SITE_URL the job does nothing.
 name: Keep free services awake
 

@@ -53,7 +53,7 @@ export function makeSupabaseAuth(env) {
   };
 }
 
-// TEAM_EMAILS="aman@gmail.com, sara@plumb.studio, @plumb.studio"  (an entry starting with @ allows a whole domain)
+// TEAM_EMAILS="aman@gmail.com, sara@cairnly.studio, @cairnly.studio"  (an entry starting with @ allows a whole domain)
 function parseTeam(raw = '') {
   const emails = new Set(); const domains = [];
   for (const part of String(raw).split(/[,\s;]+/)) {

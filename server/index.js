@@ -27,7 +27,7 @@ const PRODUCTION = env.NODE_ENV === 'production';
 const PORT = Number(env.PORT || 3000);
 const HOST = env.HOST || '0.0.0.0';
 const DB_FILE = env.DB_FILE || join(ROOT, '.data', 'chat.db');
-const DEMO_PASSWORD = 'plumb-demo';
+const DEMO_PASSWORD = 'cairnly-demo';
 const INBOX_PASSWORD = env.INBOX_PASSWORD || DEMO_PASSWORD;
 const SESSION_SECRET = env.SESSION_SECRET || randomBytes(32).toString('hex');
 const PUBLIC_URL = (env.PUBLIC_URL || '').replace(/\/+$/, '');
