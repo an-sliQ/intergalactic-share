@@ -14,6 +14,7 @@ import {
   webhookSafe, securityHeaders, makeOriginCheck,
 } from './security.js';
 import { makeStorage } from './storage.js';
+import { supabaseBaseUrl } from './supabase-url.js';
 import { restoreIfMissing, startBackups } from './backup.js';
 import { makeSupabaseAuth } from './auth.js';
 import { sniff, safeFileName, ACCEPT } from './files.js';
@@ -67,6 +68,7 @@ if (supaAuth.ready && !supaAuth.teamConfigured) console.log('\n  ℹ  Google sig
 if (PRODUCTION && !env.SESSION_SECRET) console.warn('\n  ⚠  SESSION_SECRET is not set: the team will be signed out on every restart.\n');
 if (env.NOTIFY_WEBHOOK_URL && !NOTIFY_WEBHOOK_URL) console.warn('\n  ⚠  NOTIFY_WEBHOOK_URL must start with https:// — notifications are off.\n');
 
+{ const { note } = supabaseBaseUrl(env.SUPABASE_URL); if (note) console.log(`\n  ℹ  ${note}\n`); }
 if (env.SUPABASE_URL && !store.enabled && !supaAuth.enabled) console.warn('\n  ⚠  SUPABASE_URL is set but no keys are: add SUPABASE_PUBLISHABLE_KEY (sign-in) and SUPABASE_SECRET_KEY (files + backups).\n');
 
 // On free hosting the disk starts empty: bring the database back from Supabase Storage before opening it.

@@ -69,6 +69,7 @@ Render deploys from one branch. Use `main`, so whatever is on `main` is what's l
 ### 2b. Copy three values
 In the project, click **Project Settings** (gear icon, bottom left):
 1. **Data API** → copy **Project URL** (`https://xxxxxxxx.supabase.co`). You can also click **Connect** at the top of the dashboard.
+   Copy only up to `.supabase.co`. If what you copied ends in `/rest/v1/`, delete that part. (The app removes it for you too, but the short form is cleaner.)
 2. **API Keys** →
    - **Publishable key** → copy (`sb_publishable_…`). It's safe to be public.
    - **Secret keys** → click the eye/reveal on the `default` key → copy (`sb_secret_…`). **This is a password.** It goes only into Render.
@@ -290,6 +291,8 @@ On GitHub, go to branch `main` → `public/index.html` → pencil icon → chang
 | The site takes ~1 minute to open | It was asleep (free plan) | Normal. The keep-awake job also wakes it once a day. |
 | Render deploy fails with `Refusing to start: set INBOX_PASSWORD…` | Password missing or under 12 characters | Set a longer `INBOX_PASSWORD`, or finish step 5. |
 | Logs say `Files → off` / `Backups → off` | Supabase values missing or mistyped | Re-copy `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (no spaces). |
+| Logs say `Restore attempt … failed: … 401` or `403` | Wrong secret key | Re-copy the `sb_secret_…` key into `SUPABASE_SECRET_KEY`. |
+| Logs say `SUPABASE_URL had "/rest/v1/" after the address` | You copied the longer API address | Nothing breaks: the app fixes it. To tidy up, shorten `SUPABASE_URL` to end at `.supabase.co`. |
 | Logs say `Backups → OFF this run (Supabase was unreachable at start)` | Supabase project paused or down | Supabase dashboard → **Restore project** (free), then Render → **Restart service**. |
 | Chats disappeared after a sleep | Backups weren't on yet | Finish step 2/3b. Backups run every 3 minutes and when the server sleeps. |
 | Google: `Error 400: redirect_uri_mismatch` | Callback URL in Google doesn't match Supabase's | Step 5b.4: paste the exact Callback URL from 5a. |

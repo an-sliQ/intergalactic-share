@@ -6,8 +6,10 @@
 // requires a Google identity with a verified email, and checks the email against TEAM_EMAILS.
 // Only the project URL and the *publishable* key are used here; both are public by design.
 
+import { supabaseBaseUrl } from './supabase-url.js';
+
 export function makeSupabaseAuth(env) {
-  const url = (env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const { url } = supabaseBaseUrl(env.SUPABASE_URL);
   const publishableKey = (env.SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_ANON_KEY || '').trim();
   const team = parseTeam(env.TEAM_EMAILS);
   const teamConfigured = team.emails.size > 0 || team.domains.length > 0;

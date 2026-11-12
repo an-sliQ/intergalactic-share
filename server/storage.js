@@ -6,6 +6,7 @@
 //
 // One private bucket holds everything:  files/<conversation>/<random id>   and   backups/…
 // The bucket is created (private) automatically on first start.
+import { supabaseBaseUrl } from './supabase-url.js';
 
 const MB = 1024 * 1024;
 
@@ -20,7 +21,7 @@ export const FILE_MIME_TYPES = [
 
 export function makeStorage(env, { log = console } = {}) {
   let db = null; // attached after the database is opened (it may first be restored from storage)
-  const url = (env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const { url } = supabaseBaseUrl(env.SUPABASE_URL);
   const key = (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   const bucket = (env.SUPABASE_BUCKET || 'chat').trim();
   const enabled = Boolean(url && key && /^[a-z0-9][a-z0-9._-]{1,62}$/.test(bucket));
