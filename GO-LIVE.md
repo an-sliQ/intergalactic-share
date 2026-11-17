@@ -256,6 +256,7 @@ Use either the bare domain (`cairnly.com`) or a subdomain (`chat.cairnly.com`) i
 - **Slack/Discord ping for new chats** (optional): create an incoming webhook in Slack or Discord and add it in Render as `NOTIFY_WEBHOOK_URL`.
 - **Wording, prices, client quotes:** edit `public/index.html` (see "Editing the page text" below). Replace the placeholder client quotes before you share the site.
 - **Your phone:** open `/inbox` on your phone's browser and use **Add to Home Screen**, so it opens like an app.
+- **Google Search Console:** after verifying the site, open **Sitemaps** → enter `sitemap.xml` → **Submit**. The sitemap (and `robots.txt`) are generated from `PUBLIC_URL`, so they switch to your domain automatically when you change it in step 7.
 
 ---
 
