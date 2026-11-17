@@ -349,6 +349,28 @@ const publicPage = (file, paths) => {
 publicPage('index.html', ['/', '/index.html', '/index']);
 publicPage('chat.html', ['/chat', '/chat.html']);
 
+// ---------- Search engines: sitemap.xml + robots.txt ----------
+// Built from PUBLIC_URL, so they follow the site to a custom domain. Without PUBLIC_URL (local
+// development) the address the visitor used is shown instead.
+const SITEMAP_PAGES = ['/', '/chat']; // public pages only: the team inbox stays out of search
+const siteBase = (req) => {
+  if (/^https?:\/\/[^\s/]+$/i.test(PUBLIC_URL)) return PUBLIC_URL;
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? `${proto === 'https' ? 'https' : 'http'}://${host}` : '';
+};
+const xmlEscape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+app.get('/sitemap.xml', (req, res) => {
+  const base = siteBase(req);
+  const urls = SITEMAP_PAGES.map((p) => `  <url>\n    <loc>${xmlEscape(base + p)}</loc>\n  </url>`).join('\n');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+});
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('text/plain').send(`User-agent: *\nDisallow: /inbox\nDisallow: /api/\n\nSitemap: ${siteBase(req)}/sitemap.xml\n`);
+});
+
 app.use(express.static(PUBLIC_DIR, {
   extensions: ['html'],
   dotfiles: 'ignore',

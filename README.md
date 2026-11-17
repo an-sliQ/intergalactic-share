@@ -64,7 +64,7 @@ Requires Node **22.13+**. Chat history is stored with the built-in `node:sqlite`
 ## Files
 
 ```
-server/index.js     Express + Socket.IO: pages, login, realtime events, presence, webhook
+server/index.js     Express + Socket.IO: pages, login, realtime events, presence, webhook, sitemap.xml + robots.txt (from PUBLIC_URL)
 server/db.js        SQLite schema and queries
 public/index.html   Contact page (home)
 public/chat.html    Live chat page (/chat; service links pass ?topic=…)
